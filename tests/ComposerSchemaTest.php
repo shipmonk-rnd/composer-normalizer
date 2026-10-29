@@ -46,9 +46,8 @@ final class ComposerSchemaTest extends TestCase
         'repositories/*/only-branches',
         'config/github-protocols',
         'config/forgejo-domains',
-        'config/policy/advisories',
-        'config/policy/abandoned',
-        'config/policy/ignore-unreachable',
+        'config/policy',
+        'config/policy/*',
     ];
 
     /**

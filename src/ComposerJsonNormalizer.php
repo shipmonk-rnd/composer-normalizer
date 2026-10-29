@@ -288,18 +288,41 @@ final class ComposerJsonNormalizer
     ];
 
     /**
-     * Optional keys of the schema are removed when the value is {} or [], except these.
-     * Here Composer reads an empty value differently from a missing key.
+     * Keys of config that can have an object or list value. Keys of config are in alphabetical order, so they are not in SCHEMA_KEY_ORDER.
+     */
+    private const CONFIG_OBJECT_AND_LIST_KEYS = [
+        'platform',
+        'allow-plugins',
+        'preferred-install',
+        'audit',
+        'policy',
+        'github-protocols',
+        'github-oauth',
+        'gitlab-oauth',
+        'gitlab-token',
+        'bearer',
+        'custom-headers',
+        'forgejo-token',
+        'secure-svn-domains',
+        'http-basic',
+        'client-certificate',
+        'github-domains',
+        'gitlab-domains',
+        'forgejo-domains',
+        'bitbucket-oauth',
+    ];
+
+    /**
+     * Keys of the schema are removed when the value is {} or [], except these.
      */
     private const KEEP_EMPTY = [
         'repositories/*/package', // required in package repositories
         'repositories/*/only', // matches no package
-        'repositories/*/only-branches', // matches no branch
+        'repositories/*/only-branches', // matches only the default branch
         'config/github-protocols', // replaces the default list
         'config/forgejo-domains', // replaces the default list
-        'config/policy/advisories', // stops the fallback to config.audit
-        'config/policy/abandoned', // stops the fallback to config.audit
-        'config/policy/ignore-unreachable', // ignores nothing, the default ignores install and update
+        'config/policy', // {} is the same as true, it turns on a policy that the global config turns off
+        'config/policy/*', // same as above; advisories and abandoned also stop the fallback to config.audit; ignore-unreachable ignores nothing
     ];
 
     /**
@@ -402,7 +425,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * Same as ergebnis/composer-normalize: optional keys of the schema, all keys of config.
+     * Same as ergebnis/composer-normalize: only keys of the schema are removed.
      *
      * @param list<int|string> $path
      */
@@ -411,9 +434,9 @@ final class ComposerJsonNormalizer
         int|string $key,
     ): bool
     {
-        $isSchemaKey = $path === ['config'] || in_array($key, self::getSchemaKeyOrder($path), true);
+        $schemaKeys = $path === ['config'] ? self::CONFIG_OBJECT_AND_LIST_KEYS : self::getSchemaKeyOrder($path);
 
-        return $isSchemaKey && !self::matchesAny([...$path, (string) $key], self::KEEP_EMPTY);
+        return in_array($key, $schemaKeys, true) && !self::matchesAny([...$path, $key], self::KEEP_EMPTY);
     }
 
     /**

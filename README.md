@@ -1,4 +1,4 @@
-# Composer normalizer - sort keys of composer.json
+# Composer normalizer - sort keys of composer.json and remove empty keys
 
 - 🪶 **Zero dependencies:** a small CLI, not a Composer plugin
 - 🔤 **Sorts keys:** the key order of [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), without changes to your values
@@ -60,14 +60,16 @@ Without a file, it uses the file from the `COMPOSER` environment variable, the s
 
 ## Empty keys
 
-Optional keys of the [Composer schema](https://getcomposer.org/schema.json) are removed when their value is `{}` or `[]`, for example `"require-dev": {}`, `"keywords": []` or `"autoload": {"psr-4": {}}`. In `config`, this applies to all keys. Other keys stay, for example keys in `extra` or your own scripts.
+Optional keys of the [Composer schema](https://getcomposer.org/schema.json) are removed when their value is `{}` or `[]`, for example `"require-dev": {}`, `"keywords": []` or `"autoload": {"psr-4": {}}`. Other keys stay, for example keys in `extra`, your own scripts, `config` keys that the schema does not define and items of lists.
 
 An empty value stays where Composer reads it differently from a missing key:
 
-- `repositories.*.only` and `repositories.*.only-branches`: an empty list matches no package or branch
+- `repositories.*.only`: an empty list matches no package
+- `repositories.*.only-branches`: an empty list matches only the default branch
 - `config.github-protocols` and `config.forgejo-domains`: an empty list replaces the default list
-- `config.policy.advisories` and `config.policy.abandoned`: an empty object stops the fallback to `config.audit`
-- `config.policy.ignore-unreachable`: an empty list ignores nothing, the default ignores `install` and `update`
+- `config.policy` and all keys in it: Composer reads `{}` as `true`, which turns a policy on, also when the global config turns it off. In `advisories` and `abandoned`, `{}` also stops the fallback to `config.audit`. An empty `ignore-unreachable` ignores nothing, the default ignores `install` and `update`.
+
+Composer applies `config` on top of the global config (`COMPOSER_HOME/config.json`). An empty `config.platform`, `config.secure-svn-domains`, `config.audit.ignore-severity` or `config.audit.ignore-abandoned` replaces the global value. The tool removes these empty values, so the global value applies again.
 
 ## Format and values
 
@@ -84,12 +86,13 @@ The key order is the same as in `ergebnis/composer-normalize` 2.55, except:
 - `composer` goes with the platform packages, the same as when `composer require` sorts packages.
 - `config.allow-plugins` and `config.preferred-install` keep their order when sorting would change which entry matches a package.
 - Numeric keys always go before other keys.
+- Repositories use one key order for all repository types. ergebnis puts keys that the schema does not define for the repository type last, for example `options` in a `vcs` repository. In repositories in object form (`"repositories": {"name": {...}}`), ergebnis sorts all keys alphabetically.
 
 Empty keys are removed the same as in ergebnis, except:
 
 - The empty values in the list in [Empty keys](#empty-keys) stay.
 - Keys with the value `null` stay.
-- In `config`, empty values of keys that the schema does not define are removed too.
+- In repositories, empty keys of all repository types are removed, also in repositories in object form. ergebnis removes only empty keys that the schema defines for the repository type, and none in the object form.
 
 A `composer.json` that ergebnis normalized does not change, except in the cases above and when the file has no final new line, escaped slashes (`\/`) or escaped unicode characters (`\u00e9`).
 

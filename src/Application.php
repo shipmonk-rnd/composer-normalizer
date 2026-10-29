@@ -37,7 +37,7 @@ final class Application
     private const USAGE = <<<'USAGE'
         Usage: composer-normalizer [--dry-run] [<file>...]
 
-        Sorts keys of composer.json files. Without <file>, it uses the file from the COMPOSER environment variable
+        Sorts keys of composer.json files and removes empty keys. Without <file>, it uses the file from the COMPOSER environment variable
         or composer.json in the working directory, same as Composer.
 
         Options:

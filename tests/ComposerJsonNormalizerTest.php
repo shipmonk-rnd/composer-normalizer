@@ -118,13 +118,28 @@ final class ComposerJsonNormalizerTest extends TestCase
         ];
 
         yield 'empty optional keys are removed' => [
-            ['{"keywords": [], "require-dev": {}, "autoload": {"psr-4": {}}, "config": {"platform": {}, "x-custom": []}, "scripts": {"post-install-cmd": [], "test": []}, "extra": {"a": {}}}'],
+            ['{"keywords": [], "require-dev": {}, "autoload": {"psr-4": {}}, "config": {"platform": {}}, "scripts": {"post-install-cmd": [], "test": []}, "extra": {"a": {}}}'],
             ['{', '    "extra": {', '        "a": {}', '    },', '    "scripts": {', '        "test": []', '    }', '}'],
         ];
 
         yield 'empty values stay where Composer reads them differently from a missing key' => [
             ['{"repositories": [{"type": "composer", "url": "https://a", "only": [], "options": {}}], "config": {"github-protocols": [], "policy": {"advisories": {}, "malware": {}}}}'],
-            ['{', '    "repositories": [', '        {', '            "type": "composer",', '            "url": "https://a",', '            "only": []', '        }', '    ],', '    "config": {', '        "github-protocols": [],', '        "policy": {', '            "advisories": {}', '        }', '    }', '}'],
+            ['{', '    "repositories": [', '        {', '            "type": "composer",', '            "url": "https://a",', '            "only": []', '        }', '    ],', '    "config": {', '        "github-protocols": [],', '        "policy": {', '            "advisories": {},', '            "malware": {}', '        }', '    }', '}'],
+        ];
+
+        yield 'kept empty value after its content is removed' => [
+            ['{"config": {"policy": {"advisories": {"ignore": {}}}}}'],
+            ['{', '    "config": {', '        "policy": {', '            "advisories": {}', '        }', '    }', '}'],
+        ];
+
+        yield 'config keys that the schema does not define stay empty' => [
+            ['{"config": {"x-custom": [], "0": {}, "platform": {}}}'],
+            ['{', '    "config": {', '        "0": {},', '        "x-custom": []', '    }', '}'],
+        ];
+
+        yield 'list items and keys of order-sensitive objects stay empty' => [
+            ['{"authors": [{}], "extra": {"installer-paths": {}}, "scripts": {"auto-scripts": {}}}'],
+            ['{', '    "authors": [', '        {}', '    ],', '    "extra": {', '        "installer-paths": {}', '    },', '    "scripts": {', '        "auto-scripts": {}', '    }', '}'],
         ];
 
         yield 'null values stay' => [
