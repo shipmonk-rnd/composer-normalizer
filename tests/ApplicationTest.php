@@ -121,11 +121,15 @@ final class ApplicationTest extends TestCase
 
     public function testFailedWriteKeepsFile(): void
     {
+        if (PHP_OS_FAMILY === 'Windows') {
+            self::markTestSkipped('Windows ignores the read-only attribute of directories');
+        }
+
         $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
         chmod($this->tempDir, 0555);
 
         if (is_writable($this->tempDir)) {
-            self::markTestSkipped('Directory permissions are not enforced (Windows or root)');
+            self::markTestSkipped('Directory permissions are not enforced for root');
         }
 
         self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$file]));
@@ -141,7 +145,7 @@ final class ApplicationTest extends TestCase
         chmod($file, 0200);
 
         if (is_readable($file)) {
-            self::markTestSkipped('File permissions are not enforced (Windows or root)');
+            self::markTestSkipped('File permissions are not enforced on Windows and for root');
         }
 
         self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$file]));
