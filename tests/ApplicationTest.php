@@ -14,11 +14,13 @@ use function file_put_contents;
 use function fileperms;
 use function fopen;
 use function getcwd;
+use function getenv;
 use function implode;
 use function is_link;
 use function is_readable;
 use function is_writable;
 use function mkdir;
+use function putenv;
 use function rewind;
 use function rmdir;
 use function scandir;
@@ -150,17 +152,21 @@ final class ApplicationTest extends TestCase
     public function testUsesComposerJsonInWorkingDirectory(): void
     {
         $this->createFile('composer.json', self::NOT_NORMALIZED);
-        $originalDir = (string) getcwd();
-        chdir($this->tempDir);
 
-        try {
-            self::assertSame(Application::EXIT_SUCCESS, $this->createApplication()->run([]));
-        } finally {
-            chdir($originalDir);
-        }
-
+        self::assertSame(Application::EXIT_SUCCESS, $this->runInTempDir([], composerEnv: ' '));
         self::assertSame('composer.json has been normalized' . PHP_EOL, $this->readStream($this->stdout));
         self::assertSame(self::NORMALIZED, file_get_contents($this->tempDir . '/composer.json'));
+    }
+
+    public function testUsesComposerEnvironmentVariable(): void
+    {
+        $this->createFile('composer.json', self::NOT_NORMALIZED);
+        $this->createFile('custom.json', self::NOT_NORMALIZED);
+
+        self::assertSame(Application::EXIT_SUCCESS, $this->runInTempDir([], composerEnv: 'custom.json'));
+        self::assertSame('custom.json has been normalized' . PHP_EOL, $this->readStream($this->stdout));
+        self::assertSame(self::NORMALIZED, file_get_contents($this->tempDir . '/custom.json'));
+        self::assertSame(self::NOT_NORMALIZED, file_get_contents($this->tempDir . '/composer.json'));
     }
 
     public function testReturnsWorstExitCodeOfAllFiles(): void
@@ -196,14 +202,8 @@ final class ApplicationTest extends TestCase
     public function testFileNameStartingWithDash(): void
     {
         $this->createFile('-composer.json', self::NOT_NORMALIZED);
-        $originalDir = (string) getcwd();
-        chdir($this->tempDir);
 
-        try {
-            self::assertSame(Application::EXIT_NOT_NORMALIZED, $this->createApplication()->run(['--dry-run', '--', '-composer.json']));
-        } finally {
-            chdir($originalDir);
-        }
+        self::assertSame(Application::EXIT_NOT_NORMALIZED, $this->runInTempDir(['--dry-run', '--', '-composer.json'], composerEnv: ''));
     }
 
     public function testUnknownOption(): void
@@ -244,6 +244,27 @@ final class ApplicationTest extends TestCase
         self::assertNotFalse($files);
 
         return array_values(array_diff($files, ['.', '..']));
+    }
+
+    /**
+     * @param list<string> $args
+     */
+    private function runInTempDir(
+        array $args,
+        string $composerEnv,
+    ): int
+    {
+        $originalDir = (string) getcwd();
+        $originalComposerEnv = getenv('COMPOSER');
+        chdir($this->tempDir);
+        putenv("COMPOSER={$composerEnv}");
+
+        try {
+            return $this->createApplication()->run($args);
+        } finally {
+            chdir($originalDir);
+            putenv($originalComposerEnv === false ? 'COMPOSER' : "COMPOSER={$originalComposerEnv}");
+        }
     }
 
     private function createApplication(): Application

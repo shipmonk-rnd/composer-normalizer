@@ -10,7 +10,9 @@ use function file_get_contents;
 use function file_put_contents;
 use function fileperms;
 use function fwrite;
+use function getenv;
 use function is_file;
+use function is_string;
 use function max;
 use function preg_replace;
 use function realpath;
@@ -19,6 +21,7 @@ use function restore_error_handler;
 use function set_error_handler;
 use function str_starts_with;
 use function strlen;
+use function trim;
 use function uniqid;
 use function unlink;
 use const DIRECTORY_SEPARATOR;
@@ -34,7 +37,8 @@ final class Application
     private const USAGE = <<<'USAGE'
         Usage: composer-normalizer [--dry-run] [<file>...]
 
-        Sorts keys of composer.json files. Without <file>, it uses composer.json in the working directory.
+        Sorts keys of composer.json files. Without <file>, it uses the file from the COMPOSER environment variable
+        or composer.json in the working directory, same as Composer.
 
         Options:
             --dry-run   Do not change files, exit with code 1 when a file is not normalized
@@ -96,7 +100,7 @@ final class Application
 
         $exitCode = self::EXIT_SUCCESS;
 
-        foreach ($files === [] ? ['composer.json'] : $files as $file) {
+        foreach ($files === [] ? [self::getDefaultFile()] : $files as $file) {
             $exitCode = max($exitCode, $this->processFile($file, $dryRun));
         }
 
@@ -138,6 +142,17 @@ final class Application
 
         $this->write($this->stdout, "{$file} has been normalized");
         return self::EXIT_SUCCESS;
+    }
+
+    /**
+     * Same as Composer\Factory::getComposerFile()
+     */
+    private static function getDefaultFile(): string
+    {
+        $file = getenv('COMPOSER');
+        $file = is_string($file) ? trim($file) : '';
+
+        return $file === '' ? 'composer.json' : $file;
     }
 
     /**
