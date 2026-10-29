@@ -41,7 +41,7 @@ use const JSON_UNESCAPED_UNICODE;
 use const PHP_INT_MAX;
 
 /**
- * Sorts keys of composer.json, the result is the same as with ergebnis/composer-normalize except for version constraints.
+ * Sorts keys of composer.json in the key order of ergebnis/composer-normalize, README.md lists the differences.
  *
  * Paths below use / as separator, * matches any object key or list index, # matches any list index.
  */
