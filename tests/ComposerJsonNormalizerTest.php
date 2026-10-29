@@ -56,6 +56,11 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "require": {', '        "php": "^8.1",', '        "ext-json": "*",', '        "a/a9": "1",', '        "a/a10": "1",', '        "b/b": "1"', '    }', '}'],
         ];
 
+        yield 'composer is a platform package, same as in composer sort-packages' => [
+            ['{', '    "require": {', '        "b/b": "1",', '        "composer-runtime-api": "^2",', '        "composer": "^2",', '        "php": "^8.1"', '    }', '}'],
+            ['{', '    "require": {', '        "php": "^8.1",', '        "composer": "^2",', '        "composer-runtime-api": "^2",', '        "b/b": "1"', '    }', '}'],
+        ];
+
         yield 'nested objects in alphabetical order, numbers as ksort()' => [
             ['{', '    "extra": {', '        "b": {', '            "10": 1,', '            "9": 2,', '            "a": 3', '        },', '        "a": 1', '    }', '}'],
             ['{', '    "extra": {', '        "a": 1,', '        "b": {', '            "9": 2,', '            "10": 1,', '            "a": 3', '        }', '    }', '}'],

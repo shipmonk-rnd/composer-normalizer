@@ -41,7 +41,7 @@ use const PHP_INT_MAX;
 /**
  * Sorts keys of composer.json, the result is the same as with ergebnis/composer-normalize except for version constraints.
  *
- * Paths below use / as separator, * matches any object key or list index.
+ * Paths below use / as separator, * matches any object key or list index, # matches any list index.
  */
 final class ComposerJsonNormalizer
 {
@@ -49,10 +49,45 @@ final class ComposerJsonNormalizer
     private const DEFAULT_INDENT = '    ';
     private const DEFAULT_NEW_LINE = "\n";
 
+    private const AUTHOR_KEYS = ['name', 'email', 'homepage', 'role'];
+    private const AUTOLOAD_KEYS = ['psr-0', 'psr-4', 'classmap', 'files', 'exclude-from-classmap'];
+    private const SOURCE_KEYS = ['type', 'url', 'reference', 'mirrors'];
+    private const DIST_KEYS = ['type', 'url', 'reference', 'shasum', 'mirrors'];
+    private const INLINE_PACKAGE_KEYS = [
+        'name',
+        'type',
+        'target-dir',
+        'description',
+        'keywords',
+        'homepage',
+        'version',
+        'time',
+        'license',
+        'authors',
+        'require',
+        'replace',
+        'conflict',
+        'provide',
+        'require-dev',
+        'suggest',
+        'extra',
+        'autoload',
+        'archive',
+        'bin',
+        'include-path',
+        'source',
+        'dist',
+    ];
+    private const AUDIT_IGNORE_KEYS = ['apply', 'reason'];
+    private const POLICY_IGNORE_KEYS = ['constraint', 'reason', 'on-block', 'on-audit'];
+    private const POLICY_IGNORE_ID_KEYS = ['reason', 'on-block', 'on-audit'];
+    private const USERNAME_TOKEN_KEYS = ['username', 'token'];
+
     /**
-     * Key order defined by the Composer schema (https://getcomposer.org/schema.json).
+     * Key order defined by the Composer schema (https://getcomposer.org/schema.json), tests check it against tests/data/composer-schema.json.
      * Keys that are not listed go after the listed keys, in alphabetical order.
      * Objects that are not listed here have all keys in alphabetical order.
+     * The first matching path is used.
      */
     private const SCHEMA_KEY_ORDER = [
         '' => [
@@ -96,11 +131,11 @@ final class ComposerJsonNormalizer
             'scripts-descriptions',
             'scripts-aliases',
         ],
-        'authors/*' => ['name', 'email', 'homepage', 'role'],
+        'authors/#' => self::AUTHOR_KEYS,
         'support' => ['email', 'issues', 'forum', 'wiki', 'irc', 'chat', 'source', 'docs', 'rss', 'security'],
-        'funding/*' => ['type', 'url'],
-        'source' => ['type', 'url', 'reference', 'mirrors'],
-        'dist' => ['type', 'url', 'reference', 'shasum', 'mirrors'],
+        'funding/#' => ['type', 'url'],
+        'source' => self::SOURCE_KEYS,
+        'dist' => self::DIST_KEYS,
         // all repository types in one list, each type uses a subset of these keys in this order
         'repositories/*' => [
             'name',
@@ -131,8 +166,21 @@ final class ComposerJsonNormalizer
             'package',
         ],
         'repositories/*/options' => ['reference', 'symlink', 'relative', 'versions'],
-        'autoload' => ['psr-0', 'psr-4', 'classmap', 'files', 'exclude-from-classmap'],
-        'autoload-dev' => ['psr-0', 'psr-4', 'classmap', 'files', 'exclude-from-classmap'],
+        // the package repository has one package or a list of packages
+        'repositories/*/package' => self::INLINE_PACKAGE_KEYS,
+        'repositories/*/package/authors/#' => self::AUTHOR_KEYS,
+        'repositories/*/package/autoload' => self::AUTOLOAD_KEYS,
+        'repositories/*/package/archive' => ['exclude'],
+        'repositories/*/package/source' => self::SOURCE_KEYS,
+        'repositories/*/package/dist' => self::DIST_KEYS,
+        'repositories/*/package/#' => self::INLINE_PACKAGE_KEYS,
+        'repositories/*/package/#/authors/#' => self::AUTHOR_KEYS,
+        'repositories/*/package/#/autoload' => self::AUTOLOAD_KEYS,
+        'repositories/*/package/#/archive' => ['exclude'],
+        'repositories/*/package/#/source' => self::SOURCE_KEYS,
+        'repositories/*/package/#/dist' => self::DIST_KEYS,
+        'autoload' => self::AUTOLOAD_KEYS,
+        'autoload-dev' => self::AUTOLOAD_KEYS,
         'archive' => ['name', 'exclude'],
         'php-ext' => [
             'extension-name',
@@ -145,7 +193,8 @@ final class ComposerJsonNormalizer
             'os-families-exclude',
             'configure-options',
         ],
-        'php-ext/configure-options/*' => ['name', 'needs-value', 'description'],
+        'php-ext/configure-options/#' => ['name', 'needs-value', 'description'],
+        // keys of config itself are in alphabetical order, same as in ergebnis/composer-normalize
         'config/audit' => [
             'ignore',
             'abandoned',
@@ -155,11 +204,26 @@ final class ComposerJsonNormalizer
             'block-abandoned',
             'ignore-abandoned',
         ],
+        'config/audit/ignore/*' => self::AUDIT_IGNORE_KEYS,
+        'config/audit/ignore-abandoned/*' => self::AUDIT_IGNORE_KEYS,
+        'config/audit/ignore-severity/*' => ['apply'],
         'config/policy' => ['advisories', 'malware', 'abandoned', 'cooldown', 'ignore-unreachable'],
         'config/policy/advisories' => ['block', 'audit', 'ignore-id', 'ignore', 'ignore-severity'],
+        'config/policy/advisories/ignore-id/*' => self::POLICY_IGNORE_ID_KEYS,
+        'config/policy/advisories/ignore-severity/*' => self::POLICY_IGNORE_ID_KEYS,
         'config/policy/malware' => ['block', 'block-scope', 'audit', 'ignore', 'ignore-source'],
         'config/policy/abandoned' => ['block', 'audit', 'ignore'],
         'config/policy/cooldown' => ['period', 'block', 'audit', 'ignore'],
+        'config/policy/*' => ['block', 'block-scope', 'audit', 'sources', 'ignore'], // custom policies
+        'config/policy/*/sources/#' => ['type', 'url'],
+        'config/policy/*/ignore/*' => self::POLICY_IGNORE_KEYS,
+        'config/policy/*/ignore/*/#' => self::POLICY_IGNORE_KEYS,
+        'config/gitlab-oauth/*' => ['expires-at', 'refresh-token', 'token'],
+        'config/gitlab-token/*' => self::USERNAME_TOKEN_KEYS,
+        'config/forgejo-token/*' => self::USERNAME_TOKEN_KEYS,
+        'config/http-basic/*' => ['username', 'password'],
+        'config/client-certificate/*' => ['local_cert', 'local_pk', 'passphrase'],
+        'config/bitbucket-oauth/*' => ['consumer-key', 'consumer-secret', 'access-token', 'access-token-expiration'],
         'scripts' => [
             'pre-install-cmd',
             'post-install-cmd',
@@ -266,7 +330,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * @param list<string> $path
+     * @param list<int|string> $path
      */
     private function normalizeValue(
         mixed $value,
@@ -285,7 +349,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * @param list<string> $path
+     * @param list<int|string> $path
      */
     private function normalizeObject(
         stdClass $object,
@@ -303,7 +367,7 @@ final class ComposerJsonNormalizer
 
     /**
      * @param array<mixed> $list
-     * @param list<string> $path
+     * @param list<int|string> $path
      * @return list<mixed>
      */
     private function normalizeList(
@@ -314,7 +378,7 @@ final class ComposerJsonNormalizer
         $normalized = [];
 
         foreach ($list as $index => $item) {
-            $normalized[] = $this->normalizeValue($item, [...$path, (string) $index]);
+            $normalized[] = $this->normalizeValue($item, [...$path, $index]);
         }
 
         if (self::matchesAny($path, self::SORTED_LISTS) && self::containsOnlyStrings($normalized)) {
@@ -346,7 +410,7 @@ final class ComposerJsonNormalizer
 
     /**
      * @param array<int|string, mixed> $properties numeric keys are int
-     * @param list<string> $path
+     * @param list<int|string> $path
      * @return array<int|string, mixed>
      */
     private function sortProperties(
@@ -496,7 +560,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * @param list<string> $path
+     * @param list<int|string> $path
      * @return list<string>
      */
     private static function getSchemaKeyOrder(array $path): array
@@ -511,7 +575,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * @param list<string> $path
+     * @param list<int|string> $path
      * @param list<string> $patterns
      */
     private static function matchesAny(
@@ -529,7 +593,7 @@ final class ComposerJsonNormalizer
     }
 
     /**
-     * @param list<string> $path
+     * @param list<int|string> $path
      */
     private static function matches(
         array $path,
@@ -543,7 +607,14 @@ final class ComposerJsonNormalizer
         }
 
         foreach ($patternSegments as $index => $patternSegment) {
-            if ($patternSegment !== '*' && $patternSegment !== ($path[$index] ?? null)) {
+            $segment = $path[$index] ?? null;
+            $segmentMatches = match ($patternSegment) {
+                '*' => true,
+                '#' => is_int($segment),
+                default => $segment === $patternSegment,
+            };
+
+            if (!$segmentMatches) {
                 return false;
             }
         }
