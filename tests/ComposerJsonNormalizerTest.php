@@ -72,6 +72,26 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "extra": {', '        "9": 4,', '        "10": 2,', '        "1a": 1,', '        "a": 3', '    }', '}'],
         ];
 
+        yield 'extension names in lowercase, duplicates merged' => [
+            ['{"require": {"ext-JSON": "^1.0", "php": "^8.1", "ext-json": "^2.0", "ext-Zend OPcache": "*", "Vendor/Package": "^1.0"}}'],
+            ['{', '    "require": {', '        "php": "^8.1",', '        "ext-json": "^1.0 || ^2.0",', '        "ext-zend-opcache": "*",', '        "Vendor/Package": "^1.0"', '    }', '}'],
+        ];
+
+        yield 'same values of duplicate extension names merged into one' => [
+            ['{"conflict": {"ext-json": "<1", "ext-JSON": "<1", "EXT-JSON": ">3"}}'],
+            ['{', '    "conflict": {', '        "ext-json": "<1 || >3"', '    }', '}'],
+        ];
+
+        yield 'duplicate extension names with other values than strings stay' => [
+            ['{"require": {"ext-json": 1, "ext-JSON": "*", "ext-MBSTRING": "*"}}'],
+            ['{', '    "require": {', '        "ext-JSON": "*",', '        "ext-json": 1,', '        "ext-mbstring": "*"', '    }', '}'],
+        ];
+
+        yield 'extension names outside of package links stay' => [
+            ['{"extra": {"ext-JSON": "*"}, "repositories": [{"type": "package", "package": {"name": "a/a", "version": "1.0.0", "require": {"ext-JSON": "*"}}}]}'],
+            ['{', '    "repositories": [', '        {', '            "type": "package",', '            "package": {', '                "name": "a/a",', '                "version": "1.0.0",', '                "require": {', '                    "ext-JSON": "*"', '                }', '            }', '        }', '    ],', '    "extra": {', '        "ext-JSON": "*"', '    }', '}'],
+        ];
+
         yield 'bin with other values than strings keeps order' => [
             ['{"bin": ["b", 1, "a"]}'],
             ['{', '    "bin": [', '        "b",', '        1,', '        "a"', '    ]', '}'],

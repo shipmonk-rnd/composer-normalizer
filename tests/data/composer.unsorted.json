@@ -13,6 +13,7 @@
         "ext-mbstring": "*",
         "composer-runtime-api": "^2.0",
         "ext-json": "*",
+        "ext-JSON": "*",
         "vendor/b": "^1.0",
         "php-64bit": "*",
         "vendor/a9": "^1",
