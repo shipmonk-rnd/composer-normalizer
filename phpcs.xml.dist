@@ -6,7 +6,7 @@
     <arg name="basepath" value="."/>
     <arg name="cache" value="cache/phpcs.cache"/>
 
-    <file>bin/composer-normalize</file>
+    <file>bin/composer-normalizer</file>
     <file>src/</file>
     <file>tests/</file>
 

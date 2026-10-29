@@ -1,6 +1,6 @@
 <?php declare(strict_types = 1);
 
-namespace ShipMonk\ComposerNormalize;
+namespace ShipMonk\ComposerNormalizer;
 
 use function file_get_contents;
 use function file_put_contents;
@@ -18,7 +18,7 @@ final class Application
     public const EXIT_ERROR = 2;
 
     private const USAGE = <<<'USAGE'
-        Usage: composer-normalize [--dry-run] [<file>...]
+        Usage: composer-normalizer [--dry-run] [<file>...]
 
         Sorts keys of composer.json files. Without <file>, it uses composer.json in the working directory.
 
@@ -114,7 +114,7 @@ final class Application
         }
 
         if ($dryRun) {
-            $this->write($this->stderr, "{$file} is not normalized, run composer-normalize without --dry-run to fix it");
+            $this->write($this->stderr, "{$file} is not normalized, run composer-normalizer without --dry-run to fix it");
             return self::EXIT_NOT_NORMALIZED;
         }
 

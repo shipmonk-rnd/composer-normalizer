@@ -1,6 +1,6 @@
 <?php declare(strict_types = 1);
 
-namespace ShipMonk\ComposerNormalize;
+namespace ShipMonk\ComposerNormalizer;
 
 use JsonException;
 use LogicException;

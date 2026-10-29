@@ -1,5 +1,5 @@
 {
-    "name": "shipmonk/composer-normalize",
+    "name": "shipmonk/composer-normalizer",
     "description": "Zero-dependency normalizer of composer.json: sorts keys in a stable order and keeps your indentation.",
     "license": [
         "MIT"
@@ -30,16 +30,16 @@
     },
     "autoload": {
         "psr-4": {
-            "ShipMonk\\ComposerNormalize\\": "src/"
+            "ShipMonk\\ComposerNormalizer\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "ShipMonk\\ComposerNormalize\\": "tests/"
+            "ShipMonk\\ComposerNormalizer\\": "tests/"
         }
     },
     "bin": [
-        "bin/composer-normalize"
+        "bin/composer-normalizer"
     ],
     "config": {
         "allow-plugins": {
@@ -63,7 +63,7 @@
             "composer dump-autoload -o --strict-psr"
         ],
         "check:cs": [
-            "bin/composer-normalize --dry-run",
+            "bin/composer-normalizer --dry-run",
             "phpcs"
         ],
         "check:dependencies": "composer-dependency-analyser",
@@ -71,7 +71,7 @@
         "check:tests": "phpunit",
         "check:types": "phpstan analyse -vv --ansi",
         "fix:cs": [
-            "bin/composer-normalize",
+            "bin/composer-normalizer",
             "phpcbf"
         ]
     }

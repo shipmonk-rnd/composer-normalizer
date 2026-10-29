@@ -1,10 +1,10 @@
 #!/usr/bin/env php
 <?php declare(strict_types = 1);
 
-namespace ShipMonk\ComposerNormalize\Bin;
+namespace ShipMonk\ComposerNormalizer\Bin;
 
-use ShipMonk\ComposerNormalize\Application;
-use ShipMonk\ComposerNormalize\ComposerJsonNormalizer;
+use ShipMonk\ComposerNormalizer\Application;
+use ShipMonk\ComposerNormalizer\ComposerJsonNormalizer;
 use function array_slice;
 use function fwrite;
 use function is_file;

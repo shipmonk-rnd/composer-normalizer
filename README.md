@@ -1,4 +1,4 @@
-# Composer normalize - sort keys of composer.json
+# Composer normalizer - sort keys of composer.json
 
 - 🪶 **Zero dependencies:** a small CLI, not a Composer plugin
 - 🔤 **Only sorts keys:** the same key order as [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), values stay as they are
@@ -8,7 +8,7 @@
 ## Installation
 
 ```sh
-composer require --dev shipmonk/composer-normalize
+composer require --dev shipmonk/composer-normalizer
 ```
 
 ## Usage
@@ -19,25 +19,25 @@ Add it to the scripts that check and fix your coding standard:
 {
     "scripts": {
         "check:cs": [
-            "composer-normalize --dry-run",
+            "composer-normalizer --dry-run",
             "phpcs"
         ],
         "fix:cs": [
-            "composer-normalize",
+            "composer-normalizer",
             "phpcbf"
         ]
     }
 }
 ```
 
-Put `composer-normalize` before `phpcbf`: `phpcbf` exits with code 1 when it fixes a file, and Composer then stops the script list.
+Put `composer-normalizer` before `phpcbf`: `phpcbf` exits with code 1 when it fixes a file, and Composer then stops the script list.
 
 You can also run it directly:
 
 ```sh
-vendor/bin/composer-normalize                       # sorts composer.json in the working directory
-vendor/bin/composer-normalize path/to/composer.json # sorts the given files
-vendor/bin/composer-normalize --dry-run             # only checks, does not change files
+vendor/bin/composer-normalizer                       # sorts composer.json in the working directory
+vendor/bin/composer-normalizer path/to/composer.json # sorts the given files
+vendor/bin/composer-normalizer --dry-run             # only checks, does not change files
 ```
 
 | Exit code | Meaning                                                  |
@@ -74,15 +74,15 @@ It does **not**:
 
 ```sh
 composer remove --dev ergebnis/composer-normalize
-composer require --dev shipmonk/composer-normalize
+composer require --dev shipmonk/composer-normalizer
 ```
 
 Then remove `ergebnis/composer-normalize` from `config.allow-plugins` and change your scripts:
 
-| Before                                                          | After                          |
-|-----------------------------------------------------------------|--------------------------------|
-| `composer normalize --dry-run --no-check-lock --no-update-lock` | `composer-normalize --dry-run` |
-| `composer normalize --no-check-lock --no-update-lock`           | `composer-normalize`           |
+| Before                                                          | After                           |
+|-----------------------------------------------------------------|---------------------------------|
+| `composer normalize --dry-run --no-check-lock --no-update-lock` | `composer-normalizer --dry-run` |
+| `composer normalize --no-check-lock --no-update-lock`           | `composer-normalizer`           |
 
 ## Contributing
 

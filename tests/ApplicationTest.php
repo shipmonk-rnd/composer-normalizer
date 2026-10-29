@@ -1,6 +1,6 @@
 <?php declare(strict_types = 1);
 
-namespace ShipMonk\ComposerNormalize;
+namespace ShipMonk\ComposerNormalizer;
 
 use PHPUnit\Framework\TestCase;
 use function chdir;
@@ -43,7 +43,7 @@ final class ApplicationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir() . '/composer-normalize-' . uniqid();
+        $this->tempDir = sys_get_temp_dir() . '/composer-normalizer-' . uniqid();
         mkdir($this->tempDir);
 
         $this->stdout = $this->openMemoryStream();
@@ -77,7 +77,7 @@ final class ApplicationTest extends TestCase
         $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
 
         self::assertSame(Application::EXIT_NOT_NORMALIZED, $this->createApplication()->run(['--dry-run', $file]));
-        self::assertSame("{$file} is not normalized, run composer-normalize without --dry-run to fix it" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame("{$file} is not normalized, run composer-normalizer without --dry-run to fix it" . PHP_EOL, $this->readStream($this->stderr));
         self::assertSame(self::NOT_NORMALIZED, file_get_contents($file));
     }
 
@@ -155,7 +155,7 @@ final class ApplicationTest extends TestCase
     public function testHelp(): void
     {
         self::assertSame(Application::EXIT_SUCCESS, $this->createApplication()->run(['--help']));
-        self::assertStringStartsWith('Usage: composer-normalize [--dry-run] [<file>...]', $this->readStream($this->stdout));
+        self::assertStringStartsWith('Usage: composer-normalizer [--dry-run] [<file>...]', $this->readStream($this->stdout));
     }
 
     public function testBinary(): void
@@ -163,7 +163,7 @@ final class ApplicationTest extends TestCase
         $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
         $command = implode(' ', [
             escapeshellarg(PHP_BINARY),
-            escapeshellarg(__DIR__ . '/../bin/composer-normalize'),
+            escapeshellarg(__DIR__ . '/../bin/composer-normalizer'),
             '--dry-run',
             escapeshellarg($file),
             '2>&1',
@@ -172,7 +172,7 @@ final class ApplicationTest extends TestCase
         exec($command, $output, $exitCode);
 
         self::assertSame(Application::EXIT_NOT_NORMALIZED, $exitCode);
-        self::assertSame(["{$file} is not normalized, run composer-normalize without --dry-run to fix it"], $output);
+        self::assertSame(["{$file} is not normalized, run composer-normalizer without --dry-run to fix it"], $output);
     }
 
     private function createApplication(): Application
