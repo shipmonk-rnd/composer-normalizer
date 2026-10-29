@@ -7,6 +7,7 @@ use LogicException;
 use stdClass;
 use function array_flip;
 use function array_keys;
+use function array_slice;
 use function count;
 use function explode;
 use function get_object_vars;
@@ -23,9 +24,11 @@ use function rtrim;
 use function str_contains;
 use function str_repeat;
 use function str_replace;
+use function str_starts_with;
 use function strcmp;
 use function strlen;
 use function strnatcmp;
+use function strtolower;
 use function uksort;
 use function usort;
 use const JSON_PRESERVE_ZERO_FRACTION;
@@ -190,9 +193,10 @@ final class ComposerJsonNormalizer
     ];
 
     /**
-     * The first matching entry wins, so a key with * goes after the keys it matches.
+     * Composer uses the first key that matches a package name, so a key with * goes after the keys it matches.
+     * The order is kept when sorting would change which key matches.
      */
-    private const WILDCARD_OBJECTS = [
+    private const FIRST_MATCH_OBJECTS = [
         'config/allow-plugins',
         'config/preferred-install',
     ];
@@ -359,12 +363,8 @@ final class ComposerJsonNormalizer
             return $properties;
         }
 
-        if (self::matchesAny($path, self::WILDCARD_OBJECTS)) {
-            if (self::canSortWithWildcards(array_keys($properties))) {
-                uksort($properties, self::compareWithWildcards(...));
-            }
-
-            return $properties;
+        if (self::matchesAny($path, self::FIRST_MATCH_OBJECTS)) {
+            return self::canSortFirstMatchKeys($properties) ? self::sortKeysWithWildcards($properties) : $properties;
         }
 
         $schemaPositions = array_flip(self::getSchemaKeyOrder($path));
@@ -414,6 +414,74 @@ final class ComposerJsonNormalizer
         }
 
         return true;
+    }
+
+    /**
+     * @param array<int|string, mixed> $properties
+     * @return array<int|string, mixed>
+     */
+    private static function sortKeysWithWildcards(array $properties): array
+    {
+        uksort($properties, self::compareWithWildcards(...));
+        return $properties;
+    }
+
+    /**
+     * Sorting is safe when no two keys that match the same package and have different values swap their order.
+     *
+     * @param array<int|string, mixed> $properties
+     */
+    private static function canSortFirstMatchKeys(array $properties): bool
+    {
+        if (!self::canSortWithWildcards(array_keys($properties))) {
+            return false;
+        }
+
+        $entries = [];
+
+        foreach ($properties as $key => $value) {
+            $entries[] = [(string) $key, $value];
+        }
+
+        foreach ($entries as $index => [$key, $value]) {
+            foreach (array_slice($entries, $index + 1) as [$laterKey, $laterValue]) {
+                $swapsOrder = self::compareWithWildcards($key, $laterKey) > 0;
+
+                if ($swapsOrder && $value !== $laterValue && self::canMatchSamePackage($key, $laterKey)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Works for keys with * only at the end; Composer matches them case-insensitively.
+     */
+    private static function canMatchSamePackage(
+        string $a,
+        string $b,
+    ): bool
+    {
+        $a = strtolower($a);
+        $b = strtolower($b);
+        $prefixA = rtrim($a, '*');
+        $prefixB = rtrim($b, '*');
+
+        if ($prefixA !== $a && $prefixB !== $b) {
+            return str_starts_with($prefixA, $prefixB) || str_starts_with($prefixB, $prefixA);
+        }
+
+        if ($prefixA !== $a) {
+            return str_starts_with($b, $prefixA);
+        }
+
+        if ($prefixB !== $b) {
+            return str_starts_with($a, $prefixB);
+        }
+
+        return $a === $b;
     }
 
     /**

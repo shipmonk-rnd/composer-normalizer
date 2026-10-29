@@ -161,9 +161,9 @@
     },
     "config": {
         "allow-plugins": {
-            "a/b": true,
+            "a/b": false,
             "a/*": false,
-            "b/b": false,
+            "b/b": true,
             "z/z": true
         },
         "audit": {
@@ -179,9 +179,9 @@
             "php": "8.1.0"
         },
         "preferred-install": {
-            "a/a": "source",
-            "a/*": "auto",
-            "*": "dist"
+            "a/a": "dist",
+            "a/*": "dist",
+            "b/*": "source"
         },
         "process-timeout": 0,
         "sort-packages": true,

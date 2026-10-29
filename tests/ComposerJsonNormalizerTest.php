@@ -66,14 +66,24 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "keywords": [', '        "b",', '        "a"', '    ],', '    "bin": [', '        "bin/a",', '        "bin/b"', '    ]', '}'],
         ];
 
-        yield 'allow-plugins with wildcard after the keys it matches' => [
-            ['{', '    "config": {', '        "allow-plugins": {', '            "b/*": true,', '            "a/a": true,', '            "b/b": false', '        }', '    }', '}'],
-            ['{', '    "config": {', '        "allow-plugins": {', '            "a/a": true,', '            "b/b": false,', '            "b/*": true', '        }', '    }', '}'],
-        ];
-
         yield 'allow-plugins with wildcard in the middle keeps order' => [
             ['{', '    "config": {', '        "allow-plugins": {', '            "b/*-plugin": true,', '            "a/a": true', '        }', '    }', '}'],
             ['{', '    "config": {', '        "allow-plugins": {', '            "b/*-plugin": true,', '            "a/a": true', '        }', '    }', '}'],
+        ];
+
+        yield 'allow-plugins keeps order when sorting changes the matching key' => [
+            ['{', '    "config": {', '        "allow-plugins": {', '            "*": false,', '            "a/a": true', '        }', '    }', '}'],
+            ['{', '    "config": {', '        "allow-plugins": {', '            "*": false,', '            "a/a": true', '        }', '    }', '}'],
+        ];
+
+        yield 'preferred-install keeps order when sorting changes the matching key' => [
+            ['{', '    "config": {', '        "preferred-install": {', '            "a/*": "dist",', '            "A/b": "source"', '        }', '    }', '}'],
+            ['{', '    "config": {', '        "preferred-install": {', '            "a/*": "dist",', '            "A/b": "source"', '        }', '    }', '}'],
+        ];
+
+        yield 'allow-plugins sorts wildcard with the same value' => [
+            ['{', '    "config": {', '        "allow-plugins": {', '            "a/*": true,', '            "b/b": false,', '            "a/a": true', '        }', '    }', '}'],
+            ['{', '    "config": {', '        "allow-plugins": {', '            "a/a": true,', '            "a/*": true,', '            "b/b": false', '        }', '    }', '}'],
         ];
 
         yield 'order-sensitive objects keep order' => [

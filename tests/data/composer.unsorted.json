@@ -45,8 +45,8 @@
     "config": {
         "allow-plugins": {
             "a/*": false,
-            "a/b": true,
-            "b/b": false,
+            "a/b": false,
+            "b/b": true,
             "z/z": true
         },
         "vendor-dir": "vendor",
@@ -56,9 +56,9 @@
         },
         "process-timeout": 0,
         "preferred-install": {
-            "a/a": "source",
-            "a/*": "auto",
-            "*": "dist"
+            "a/a": "dist",
+            "a/*": "dist",
+            "b/*": "source"
         },
         "audit": {
             "ignore": {
