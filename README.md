@@ -1,7 +1,8 @@
 # Composer normalizer - sort keys of composer.json
 
 - 🪶 **Zero dependencies:** a small CLI, not a Composer plugin
-- 🔤 **Only sorts keys:** the key order of [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), without changes to your values
+- 🔤 **Sorts keys:** the key order of [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), without changes to your values
+- 🧹 **Removes empty keys:** `"require-dev": {}`, `"keywords": []` and other empty optional keys
 - 📐 **Keeps your format:** indentation (spaces or tabs, any size) and new lines are taken from the file
 - ✨ **Compatible:** PHP 8.1+
 
@@ -57,6 +58,17 @@ Without a file, it uses the file from the `COMPOSER` environment variable, the s
 - **`config.allow-plugins` and `config.preferred-install`** are sorted alphabetically, but `vendor/*` goes after `vendor/package`. Composer uses the first entry that matches a package, so the order stays when sorting would change which entry matches.
 - **The order stays** where the order has a meaning: `repositories`, `extra.installer-paths`, `extra.patches.*`, `scripts.auto-scripts` and all lists, except `bin`, `repositories.*.only` and `repositories.*.exclude`.
 
+## Empty keys
+
+Optional keys of the [Composer schema](https://getcomposer.org/schema.json) are removed when their value is `{}` or `[]`, for example `"require-dev": {}`, `"keywords": []` or `"autoload": {"psr-4": {}}`. In `config`, this applies to all keys. Other keys stay, for example keys in `extra` or your own scripts.
+
+An empty value stays where Composer reads it differently from a missing key:
+
+- `repositories.*.only` and `repositories.*.only-branches`: an empty list matches no package or branch
+- `config.github-protocols` and `config.forgejo-domains`: an empty list replaces the default list
+- `config.policy.advisories` and `config.policy.abandoned`: an empty object stops the fallback to `config.audit`
+- `config.policy.ignore-unreachable`: an empty list ignores nothing, the default ignores `install` and `update`
+
 ## Format and values
 
 - The output always ends with a new line.
@@ -73,15 +85,21 @@ The key order is the same as in `ergebnis/composer-normalize` 2.55, except:
 - `config.allow-plugins` and `config.preferred-install` keep their order when sorting would change which entry matches a package.
 - Numeric keys always go before other keys.
 
-A `composer.json` that ergebnis normalized does not change, except in the cases above and when the file has no final new line, escaped slashes (`\/`) or escaped unicode characters (`é`).
+Empty keys are removed the same as in ergebnis, except:
+
+- The empty values in the list in [Empty keys](#empty-keys) stay.
+- Keys with the value `null` stay.
+- In `config`, empty values of keys that the schema does not define are removed too.
+
+A `composer.json` that ergebnis normalized does not change, except in the cases above and when the file has no final new line, escaped slashes (`\/`) or escaped unicode characters (`\u00e9`).
 
 This tool does **not**:
 
 - **register a Composer plugin**: there is no `composer normalize` command and no `allow-plugins` entry. The tool does not load Composer internals, so it does not block an upgrade of PHP or Composer.
-- **change values**: ergebnis also changes version constraints (`^1.0|^2.0` becomes `^1.0 || ^2.0`), removes empty sections such as `"require-dev": {}`, writes `ext-JSON` as `ext-json` and `1.0` as `1`.
+- **change values**: ergebnis also changes version constraints (`^1.0|^2.0` becomes `^1.0 || ^2.0`), writes `ext-JSON` as `ext-json` and `1.0` as `1`.
 - **show a diff**: run it without `--dry-run` and use `git diff`.
 - **validate the schema**: use `composer validate --strict`.
-- **update `composer.lock`**: the `content-hash` in `composer.lock` depends on the key order in `require`, `require-dev`, `conflict`, `replace`, `provide`, `extra` and `config.platform`. When the tool changes the order there, run `composer update --lock`.
+- **update `composer.lock`**: the `content-hash` in `composer.lock` depends on `require`, `require-dev`, `conflict`, `replace`, `provide`, `repositories`, `extra`, `config.platform` and `config.policy`, also on their key order and empty values. When the tool changes them, run `composer update --lock`.
 - **have indent options**: the indentation comes from the file.
 
 ### Migration

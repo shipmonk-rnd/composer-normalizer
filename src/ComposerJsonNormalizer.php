@@ -11,6 +11,7 @@ use function array_slice;
 use function count;
 use function explode;
 use function get_object_vars;
+use function in_array;
 use function ini_set;
 use function intdiv;
 use function is_array;
@@ -41,7 +42,7 @@ use const JSON_UNESCAPED_UNICODE;
 use const PHP_INT_MAX;
 
 /**
- * Sorts keys of composer.json in the key order of ergebnis/composer-normalize, README.md lists the differences.
+ * Sorts keys of composer.json in the key order of ergebnis/composer-normalize and removes empty optional keys, README.md lists the differences.
  *
  * Paths below use / as separator, * matches any object key or list index, # matches any list index.
  */
@@ -287,6 +288,21 @@ final class ComposerJsonNormalizer
     ];
 
     /**
+     * Optional keys of the schema are removed when the value is {} or [], except these.
+     * Here Composer reads an empty value differently from a missing key.
+     */
+    private const KEEP_EMPTY = [
+        'repositories/*/package', // required in package repositories
+        'repositories/*/only', // matches no package
+        'repositories/*/only-branches', // matches no branch
+        'config/github-protocols', // replaces the default list
+        'config/forgejo-domains', // replaces the default list
+        'config/policy/advisories', // stops the fallback to config.audit
+        'config/policy/abandoned', // stops the fallback to config.audit
+        'config/policy/ignore-unreachable', // ignores nothing, the default ignores install and update
+    ];
+
+    /**
      * Same as Composer\Repository\PlatformRepository::PLATFORM_PACKAGE_REGEX
      */
     private const PLATFORM_PACKAGE_REGEX = '{^(?:php(?:-64bit|-ipv6|-zts|-debug)?|hhvm|(?:ext|lib)-[a-z0-9](?:[_.-]?[a-z0-9]+)*|composer(?:-(?:plugin|runtime)-api)?)$}iD';
@@ -368,10 +384,36 @@ final class ComposerJsonNormalizer
         $normalized = new stdClass();
 
         foreach ($this->sortProperties(get_object_vars($object), $path) as $key => $value) {
-            $normalized->{$key} = $this->normalizeValue($value, [...$path, (string) $key]);
+            $normalizedValue = $this->normalizeValue($value, [...$path, (string) $key]);
+
+            if (self::isEmpty($normalizedValue) && self::isRemovableWhenEmpty($path, $key)) {
+                continue;
+            }
+
+            $normalized->{$key} = $normalizedValue;
         }
 
         return $normalized;
+    }
+
+    private static function isEmpty(mixed $value): bool
+    {
+        return $value === [] || ($value instanceof stdClass && get_object_vars($value) === []);
+    }
+
+    /**
+     * Same as ergebnis/composer-normalize: optional keys of the schema, all keys of config.
+     *
+     * @param list<int|string> $path
+     */
+    private static function isRemovableWhenEmpty(
+        array $path,
+        int|string $key,
+    ): bool
+    {
+        $isSchemaKey = $path === ['config'] || in_array($key, self::getSchemaKeyOrder($path), true);
+
+        return $isSchemaKey && !self::matchesAny([...$path, (string) $key], self::KEEP_EMPTY);
     }
 
     /**
