@@ -2,12 +2,26 @@
 
 namespace ShipMonk\ComposerNormalizer;
 
+use Closure;
+use function basename;
+use function chmod;
+use function dirname;
 use function file_get_contents;
 use function file_put_contents;
+use function fileperms;
 use function fwrite;
 use function is_file;
 use function max;
+use function preg_replace;
+use function realpath;
+use function rename;
+use function restore_error_handler;
+use function set_error_handler;
 use function str_starts_with;
+use function strlen;
+use function uniqid;
+use function unlink;
+use const DIRECTORY_SEPARATOR;
 use const PHP_EOL;
 
 final class Application
@@ -94,15 +108,12 @@ final class Application
         bool $dryRun,
     ): int
     {
-        $original = is_file($file) ? file_get_contents($file) : false;
-
-        if ($original === false) {
-            $this->write($this->stderr, "Cannot read {$file}");
-            return self::EXIT_ERROR;
-        }
-
         try {
+            $original = self::readFile($file);
             $normalized = $this->normalizer->normalize($original);
+        } catch (FileAccessException $e) {
+            $this->write($this->stderr, $e->getMessage());
+            return self::EXIT_ERROR;
         } catch (InvalidComposerJsonException $e) {
             $this->write($this->stderr, "Cannot normalize {$file}: {$e->getMessage()}");
             return self::EXIT_ERROR;
@@ -118,13 +129,92 @@ final class Application
             return self::EXIT_NOT_NORMALIZED;
         }
 
-        if (file_put_contents($file, $normalized) === false) {
-            $this->write($this->stderr, "Cannot write {$file}");
+        try {
+            self::writeFile($file, $normalized);
+        } catch (FileAccessException $e) {
+            $this->write($this->stderr, $e->getMessage());
             return self::EXIT_ERROR;
         }
 
         $this->write($this->stdout, "{$file} has been normalized");
         return self::EXIT_SUCCESS;
+    }
+
+    /**
+     * @throws FileAccessException
+     */
+    private static function readFile(string $file): string
+    {
+        if (!is_file($file)) {
+            throw new FileAccessException("Cannot read {$file}: file not found");
+        }
+
+        [$contents, $warning] = self::callWithoutWarnings(static fn (): string|false => file_get_contents($file));
+
+        if ($contents === false) {
+            throw new FileAccessException("Cannot read {$file}: {$warning}");
+        }
+
+        return $contents;
+    }
+
+    /**
+     * Writes a temporary file next to the target and renames it, so a failed write does not destroy the target.
+     *
+     * @throws FileAccessException
+     */
+    private static function writeFile(
+        string $file,
+        string $contents,
+    ): void
+    {
+        $target = realpath($file); // keeps symlinks
+
+        if ($target === false) {
+            throw new FileAccessException("Cannot write {$file}: file not found");
+        }
+
+        $tempFile = dirname($target) . DIRECTORY_SEPARATOR . '.' . basename($target) . '.' . uniqid() . '.tmp';
+        [$writtenBytes, $warning] = self::callWithoutWarnings(static fn (): int|false => file_put_contents($tempFile, $contents));
+
+        if ($writtenBytes === strlen($contents)) {
+            $permissions = fileperms($target);
+            self::callWithoutWarnings(static fn (): bool => $permissions !== false && chmod($tempFile, $permissions & 0777));
+            [$renamed, $warning] = self::callWithoutWarnings(static fn (): bool => rename($tempFile, $target));
+
+            if ($renamed) {
+                return;
+            }
+        }
+
+        self::callWithoutWarnings(static fn (): bool => unlink($tempFile));
+        throw new FileAccessException("Cannot write {$file}: {$warning}");
+    }
+
+    /**
+     * Returns the result of the call and the message of the last PHP warning it triggered, the warning is not printed.
+     *
+     * @param Closure(): T $call
+     * @return array{T, string}
+     *
+     * @template T
+     */
+    private static function callWithoutWarnings(Closure $call): array
+    {
+        $warning = 'unknown error';
+
+        set_error_handler(static function (int $level, string $message) use (&$warning): bool {
+            $warning = preg_replace('~^\w+\(.*?\): ~', '', $message) ?? $message; // removes "file_get_contents(path): "
+            return true;
+        });
+
+        try {
+            $result = $call();
+        } finally {
+            restore_error_handler();
+        }
+
+        return [$result, $warning];
     }
 
     /**

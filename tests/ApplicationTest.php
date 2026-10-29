@@ -3,25 +3,33 @@
 namespace ShipMonk\ComposerNormalizer;
 
 use PHPUnit\Framework\TestCase;
+use function array_diff;
+use function array_values;
 use function chdir;
+use function chmod;
 use function escapeshellarg;
 use function exec;
 use function file_get_contents;
 use function file_put_contents;
+use function fileperms;
 use function fopen;
 use function getcwd;
-use function glob;
 use function implode;
-use function is_dir;
+use function is_link;
+use function is_readable;
+use function is_writable;
 use function mkdir;
 use function rewind;
 use function rmdir;
+use function scandir;
 use function stream_get_contents;
+use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
 use function unlink;
 use const PHP_BINARY;
 use const PHP_EOL;
+use const PHP_OS_FAMILY;
 
 final class ApplicationTest extends TestCase
 {
@@ -52,15 +60,13 @@ final class ApplicationTest extends TestCase
 
     protected function tearDown(): void
     {
-        $files = glob($this->tempDir . '/*');
+        chmod($this->tempDir, 0755);
 
-        foreach ($files === false ? [] : $files as $file) {
-            unlink($file);
+        foreach ($this->listTempDir() as $file) {
+            unlink($this->tempDir . '/' . $file);
         }
 
-        if (is_dir($this->tempDir)) {
-            rmdir($this->tempDir);
-        }
+        rmdir($this->tempDir);
     }
 
     public function testDryRunWithNormalizedFile(): void
@@ -78,6 +84,7 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(Application::EXIT_NOT_NORMALIZED, $this->createApplication()->run(['--dry-run', $file]));
         self::assertSame("{$file} is not normalized, run composer-normalizer without --dry-run to fix it" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame('', $this->readStream($this->stdout));
         self::assertSame(self::NOT_NORMALIZED, file_get_contents($file));
     }
 
@@ -87,7 +94,57 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(Application::EXIT_SUCCESS, $this->createApplication()->run([$file]));
         self::assertSame("{$file} has been normalized" . PHP_EOL, $this->readStream($this->stdout));
+        self::assertSame('', $this->readStream($this->stderr));
         self::assertSame(self::NORMALIZED, file_get_contents($file));
+        self::assertSame(['composer.json'], $this->listTempDir());
+    }
+
+    public function testKeepsSymlinkAndPermissions(): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            self::markTestSkipped('Symlinks and Unix permissions are not available on Windows');
+        }
+
+        $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
+        $link = $this->tempDir . '/link.json';
+        chmod($file, 0640);
+        symlink($file, $link);
+
+        self::assertSame(Application::EXIT_SUCCESS, $this->createApplication()->run([$link]));
+        self::assertTrue(is_link($link));
+        self::assertSame(self::NORMALIZED, file_get_contents($file));
+        self::assertSame(0640, fileperms($file) & 0777);
+        self::assertSame(['composer.json', 'link.json'], $this->listTempDir());
+    }
+
+    public function testFailedWriteKeepsFile(): void
+    {
+        $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
+        chmod($this->tempDir, 0555);
+
+        if (is_writable($this->tempDir)) {
+            self::markTestSkipped('Directory permissions are not enforced (Windows or root)');
+        }
+
+        self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$file]));
+        self::assertSame("Cannot write {$file}: Failed to open stream: Permission denied" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame('', $this->readStream($this->stdout));
+        self::assertSame(self::NOT_NORMALIZED, file_get_contents($file));
+        self::assertSame(['composer.json'], $this->listTempDir());
+    }
+
+    public function testUnreadableFile(): void
+    {
+        $file = $this->createFile('composer.json', self::NOT_NORMALIZED);
+        chmod($file, 0200);
+
+        if (is_readable($file)) {
+            self::markTestSkipped('File permissions are not enforced (Windows or root)');
+        }
+
+        self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$file]));
+        self::assertSame("Cannot read {$file}: Failed to open stream: Permission denied" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame('', $this->readStream($this->stdout));
     }
 
     public function testUsesComposerJsonInWorkingDirectory(): void
@@ -114,6 +171,8 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(Application::EXIT_NOT_NORMALIZED, $this->createApplication()->run(['--dry-run', $normalized, $notNormalized]));
         self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run(['--dry-run', $missing, $notNormalized]));
+        self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$missing, $notNormalized]));
+        self::assertSame(self::NORMALIZED, file_get_contents($notNormalized)); // files after an error are processed too
     }
 
     public function testMissingFile(): void
@@ -121,7 +180,8 @@ final class ApplicationTest extends TestCase
         $file = $this->tempDir . '/missing.json';
 
         self::assertSame(Application::EXIT_ERROR, $this->createApplication()->run([$file]));
-        self::assertSame("Cannot read {$file}" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame("Cannot read {$file}: file not found" . PHP_EOL, $this->readStream($this->stderr));
+        self::assertSame('', $this->readStream($this->stdout));
     }
 
     public function testInvalidJson(): void
@@ -173,6 +233,17 @@ final class ApplicationTest extends TestCase
 
         self::assertSame(Application::EXIT_NOT_NORMALIZED, $exitCode);
         self::assertSame(["{$file} is not normalized, run composer-normalizer without --dry-run to fix it"], $output);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function listTempDir(): array
+    {
+        $files = scandir($this->tempDir);
+        self::assertNotFalse($files);
+
+        return array_values(array_diff($files, ['.', '..']));
     }
 
     private function createApplication(): Application
