@@ -11,6 +11,7 @@ use function array_slice;
 use function count;
 use function explode;
 use function get_object_vars;
+use function ini_set;
 use function intdiv;
 use function is_array;
 use function is_int;
@@ -34,6 +35,7 @@ use function usort;
 use const JSON_PRESERVE_ZERO_FRACTION;
 use const JSON_PRETTY_PRINT;
 use const JSON_THROW_ON_ERROR;
+use const JSON_UNESCAPED_LINE_TERMINATORS;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_INT_MAX;
@@ -306,16 +308,23 @@ final class ComposerJsonNormalizer
             throw new InvalidComposerJsonException('Expected a JSON object at the top level');
         }
 
+        // -1 gives the shortest float that decodes to the same value, the ini can have another value
+        $previousSerializePrecision = ini_set('serialize_precision', '-1');
+
         try {
             $encoded = json_encode(
                 $this->normalizeObject($decoded, []),
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_LINE_TERMINATORS | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR,
             );
         } catch (JsonException $e) {
-            throw new LogicException('Decoded JSON cannot be encoded: ' . $e->getMessage(), 0, $e);
+            throw new InvalidComposerJsonException('Cannot encode JSON: ' . $e->getMessage(), $e); // e.g. 1e400 is decoded as INF
+        } finally {
+            if ($previousSerializePrecision !== false) {
+                ini_set('serialize_precision', $previousSerializePrecision);
+            }
         }
 
-        $indent = preg_match('~^( +|\t+)~m', $json, $indentMatch) === 1 ? $indentMatch[1] : self::DEFAULT_INDENT;
+        $indent = preg_match('~(?:^|[\r\n])( +|\t+)~', $json, $indentMatch) === 1 ? $indentMatch[1] : self::DEFAULT_INDENT;
         $newLine = preg_match('~\r\n|\n|\r~', $json, $newLineMatch) === 1 ? $newLineMatch[0] : self::DEFAULT_NEW_LINE;
 
         if ($indent !== self::DEFAULT_INDENT) {
@@ -441,8 +450,16 @@ final class ComposerJsonNormalizer
                 return $positionA <=> $positionB;
             }
 
-            // same as ksort() for numeric keys: 9 before 10
-            return is_int($a) && is_int($b) ? $a <=> $b : strcmp((string) $a, (string) $b);
+            // numeric keys first, by value (9 before 10, same as ksort()), then other keys
+            if (is_int($a) && is_int($b)) {
+                return $a <=> $b;
+            }
+
+            if (is_int($a) || is_int($b)) {
+                return is_int($a) ? -1 : 1;
+            }
+
+            return strcmp($a, $b);
         });
 
         return $properties;

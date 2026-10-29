@@ -6,6 +6,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use function file_get_contents;
 use function implode;
+use function ini_get;
+use function ini_set;
 use function str_replace;
 
 final class ComposerJsonNormalizerTest extends TestCase
@@ -34,11 +36,10 @@ final class ComposerJsonNormalizerTest extends TestCase
     ): void
     {
         $normalizer = new ComposerJsonNormalizer();
+        $expectedJson = implode("\n", $expected) . "\n";
 
-        self::assertSame(
-            implode("\n", $expected) . "\n",
-            $normalizer->normalize(implode("\n", $input)),
-        );
+        self::assertSame($expectedJson, $normalizer->normalize(implode("\n", $input)));
+        self::assertSame($expectedJson, $normalizer->normalize($expectedJson));
     }
 
     /**
@@ -64,6 +65,16 @@ final class ComposerJsonNormalizerTest extends TestCase
         yield 'nested objects in alphabetical order, numbers as ksort()' => [
             ['{', '    "extra": {', '        "b": {', '            "10": 1,', '            "9": 2,', '            "a": 3', '        },', '        "a": 1', '    }', '}'],
             ['{', '    "extra": {', '        "a": 1,', '        "b": {', '            "9": 2,', '            "10": 1,', '            "a": 3', '        }', '    }', '}'],
+        ];
+
+        yield 'numeric keys first, then other keys' => [
+            ['{"extra": {"1a": 1, "10": 2, "a": 3, "9": 4}}'],
+            ['{', '    "extra": {', '        "9": 4,', '        "10": 2,', '        "1a": 1,', '        "a": 3', '    }', '}'],
+        ];
+
+        yield 'bin with other values than strings keeps order' => [
+            ['{"bin": ["b", 1, "a"]}'],
+            ['{', '    "bin": [', '        "b",', '        1,', '        "a"', '    ]', '}'],
         ];
 
         yield 'lists keep their order, except bin' => [
@@ -103,7 +114,12 @@ final class ComposerJsonNormalizerTest extends TestCase
 
         yield 'values are kept' => [
             ['{"extra": {"float": 1.0, "unicode": "é", "slash": "a\/b", "object": {}, "list": [], "0": "zero", "": "empty"}}'],
-            ['{', '    "extra": {', '        "": "empty",', '        "0": "zero",', '        "float": 1.0,', '        "list": [],', '        "object": {},', '        "slash": "a/b",', '        "unicode": "é"', '    }', '}'],
+            ['{', '    "extra": {', '        "0": "zero",', '        "": "empty",', '        "float": 1.0,', '        "list": [],', '        "object": {},', '        "slash": "a/b",', '        "unicode": "é"', '    }', '}'],
+        ];
+
+        yield 'line terminators stay unescaped' => [
+            ["{\"description\": \"a\u{2028}b\\u2029c\"}"],
+            ['{', "    \"description\": \"a\u{2028}b\u{2029}c\"", '}'],
         ];
 
         yield 'empty object' => [
@@ -136,8 +152,8 @@ final class ComposerJsonNormalizerTest extends TestCase
     #[DataProvider('provideNewLines')]
     public function testKeepsNewLine(string $newLine): void
     {
-        $input = "{\n    \"require\": {},\n    \"name\": \"a/a\"\n}\n";
-        $expected = "{\n    \"name\": \"a/a\",\n    \"require\": {}\n}\n";
+        $input = "{\n  \"require\": {},\n  \"name\": \"a/a\"\n}\n";
+        $expected = "{\n  \"name\": \"a/a\",\n  \"require\": {}\n}\n";
 
         $normalizer = new ComposerJsonNormalizer();
 
@@ -162,6 +178,39 @@ final class ComposerJsonNormalizerTest extends TestCase
         $normalizer = new ComposerJsonNormalizer();
 
         self::assertSame("{\n    \"name\": \"a/a\"\n}\n", $normalizer->normalize("{\n    \"name\": \"a/a\"\n}"));
+    }
+
+    public function testKeyOrderDoesNotDependOnInputOrder(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+        $expected = $normalizer->normalize('{"extra": {"9": 1, "10": 2, "1a": 3}}');
+
+        foreach (['{"extra": {"10": 2, "1a": 3, "9": 1}}', '{"extra": {"1a": 3, "9": 1, "10": 2}}', '{"extra": {"1a": 3, "10": 2, "9": 1}}'] as $input) {
+            self::assertSame($expected, $normalizer->normalize($input));
+        }
+    }
+
+    public function testIgnoresSerializePrecisionSetting(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+        $previousSerializePrecision = ini_set('serialize_precision', '17');
+
+        try {
+            self::assertSame("{\n    \"extra\": 0.1\n}\n", $normalizer->normalize('{"extra": 0.1}'));
+            self::assertSame('17', ini_get('serialize_precision'));
+        } finally {
+            ini_set('serialize_precision', (string) $previousSerializePrecision);
+        }
+    }
+
+    public function testNumberOutOfRange(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+
+        $this->expectException(InvalidComposerJsonException::class);
+        $this->expectExceptionMessage('Cannot encode JSON: Inf and NaN cannot be JSON encoded');
+
+        $normalizer->normalize('{"extra": 1e400}');
     }
 
     public function testInvalidJson(): void
