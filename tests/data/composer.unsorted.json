@@ -1,0 +1,248 @@
+{
+    "authors": [
+        {
+            "email": "a@example.com",
+            "role": "Dev",
+            "name": "A",
+            "homepage": "https://a.example"
+        }
+    ],
+    "require": {
+        "a/b": "^1",
+        "vendor/a10": "^1",
+        "ext-mbstring": "*",
+        "composer-runtime-api": "^2.0",
+        "ext-json": "*",
+        "vendor/b": "^1.0",
+        "php-64bit": "*",
+        "vendor/a9": "^1",
+        "php": "^8.1",
+        "composer-plugin-api": "^2.0",
+        "lib-pcre": "*"
+    },
+    "keywords": [
+        "z",
+        "a"
+    ],
+    "prefer-stable": true,
+    "zzz-custom": true,
+    "autoload-dev": {
+        "classmap": [
+            "tests/_fixtures"
+        ],
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts-descriptions": {
+        "test": "Run tests",
+        "build": "Build"
+    },
+    "replace": {
+        "symfony/polyfill-ctype": "*",
+        "symfony/polyfill-php80": "*"
+    },
+    "config": {
+        "allow-plugins": {
+            "a/*": false,
+            "a/b": true,
+            "b/b": false,
+            "z/z": true
+        },
+        "vendor-dir": "vendor",
+        "platform": {
+            "php": "8.1.0",
+            "ext-intl": "1.0"
+        },
+        "process-timeout": 0,
+        "preferred-install": {
+            "a/a": "source",
+            "a/*": "auto",
+            "*": "dist"
+        },
+        "audit": {
+            "ignore": {
+                "CVE-1": "reason",
+                "CVE-0": "other"
+            },
+            "abandoned": "report"
+        },
+        "sort-packages": true,
+        "bin-dir": "bin"
+    },
+    "bin": [
+        "bin/z",
+        "bin/a"
+    ],
+    "conflict": {
+        "z/z": "<1",
+        "a/a": "<1"
+    },
+    "support": {
+        "security": "https://sec",
+        "issues": "https://i",
+        "source": "https://s",
+        "email": "s@example.com",
+        "docs": "https://d"
+    },
+    "funding": [
+        {
+            "url": "https://f",
+            "type": "github"
+        }
+    ],
+    "extra": {
+        "z": {
+            "a": 2,
+            "9": "y",
+            "10": "x",
+            "b": 1
+        },
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        },
+        "patches": {
+            "a/a": {
+                "a": "y",
+                "b": "x"
+            },
+            "z/z": {
+                "second": "p2.patch",
+                "first": "p1.patch"
+            }
+        },
+        "installer-paths": {
+            "z/{$name}": [
+                "type:a"
+            ],
+            "a/{$name}": [
+                "type:b"
+            ]
+        }
+    },
+    "time": "2020-01-01",
+    "minimum-stability": "dev",
+    "scripts-aliases": {
+        "test": [
+            "t"
+        ],
+        "build": [
+            "b"
+        ]
+    },
+    "homepage": "https://example.com",
+    "archive": {
+        "name": "edge",
+        "exclude": [
+            "/tests"
+        ]
+    },
+    "name": "acme/edge",
+    "abandoned": false,
+    "require-dev": {
+        "z/z": "^1",
+        "phpunit/phpunit": "^10",
+        "ext-xdebug": "*"
+    },
+    "repositories": [
+        {
+            "options": {
+                "ssl": {
+                    "verify_peer": false,
+                    "allow_self_signed": true
+                }
+            },
+            "exclude": [
+                "b/b",
+                "a/*",
+                "a/a"
+            ],
+            "canonical": false,
+            "type": "composer",
+            "url": "https://repo.example.com"
+        },
+        {
+            "type": "path",
+            "url": "../path",
+            "options": {
+                "versions": {
+                    "a/a": "1.0"
+                },
+                "reference": "none",
+                "relative": true,
+                "symlink": false
+            }
+        },
+        {
+            "type": "vcs",
+            "only": [
+                "a/z",
+                "a/*",
+                "a/b"
+            ],
+            "no-api": true,
+            "url": "https://github.com/a/a"
+        },
+        {
+            "type": "artifact",
+            "url": "artifacts/"
+        }
+    ],
+    "license": "MIT",
+    "_comment": "comment",
+    "scripts": {
+        "auto-scripts": {
+            "a": "symfony-cmd",
+            "z": "symfony-cmd"
+        },
+        "test": "phpunit",
+        "build": [
+            "@test"
+        ],
+        "post-update-cmd": "x",
+        "post-install-cmd": [
+            "b",
+            "a"
+        ],
+        "pre-install-cmd": "y"
+    },
+    "autoload": {
+        "files": [
+            "f.php"
+        ],
+        "classmap": [
+            "src/"
+        ],
+        "psr-0": {
+            "Z_": "z"
+        },
+        "psr-4": {
+            "B\\": "src/B",
+            "A\\": [
+                "src/A",
+                "lib/A"
+            ]
+        },
+        "exclude-from-classmap": [
+            "tests/"
+        ]
+    },
+    "type": "library",
+    "include-path": [
+        "lib/"
+    ],
+    "version": "1.0.0",
+    "non-feature-branches": [
+        "main"
+    ],
+    "provide": {
+        "psr/log-implementation": "1.0",
+        "ext-foo": "1.0"
+    },
+    "suggest": {
+        "a/a": "for a",
+        "ext-intl": "for intl"
+    },
+    "description": "Edge cases",
+    "readme": "README.md"
+}

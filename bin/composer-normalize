@@ -1,0 +1,36 @@
+#!/usr/bin/env php
+<?php declare(strict_types = 1);
+
+namespace ShipMonk\ComposerNormalize\Bin;
+
+use ShipMonk\ComposerNormalize\Application;
+use ShipMonk\ComposerNormalize\ComposerJsonNormalizer;
+use function array_slice;
+use function fwrite;
+use function is_file;
+use const PHP_EOL;
+use const STDERR;
+use const STDOUT;
+
+$autoloadCandidates = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php', // installed inside another project's vendor/
+];
+
+$autoloaderFound = false;
+
+foreach ($autoloadCandidates as $candidate) {
+    if (is_file($candidate)) {
+        require $candidate;
+        $autoloaderFound = true;
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fwrite(STDERR, 'Could not locate Composer autoloader.' . PHP_EOL);
+    exit(2);
+}
+
+$application = new Application(new ComposerJsonNormalizer(), STDOUT, STDERR);
+exit($application->run(array_slice($argv ?? [], 1)));

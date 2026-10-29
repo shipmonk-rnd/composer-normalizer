@@ -1,0 +1,172 @@
+<?php declare(strict_types = 1);
+
+namespace ShipMonk\ComposerNormalize;
+
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use function file_get_contents;
+use function implode;
+use function str_replace;
+
+final class ComposerJsonNormalizerTest extends TestCase
+{
+
+    public function testNormalizesAllSections(): void
+    {
+        // composer.sorted.json is the output of ergebnis/composer-normalize 2.55.0 for composer.unsorted.json
+        $unsorted = (string) file_get_contents(__DIR__ . '/data/composer.unsorted.json');
+        $sorted = (string) file_get_contents(__DIR__ . '/data/composer.sorted.json');
+
+        $normalizer = new ComposerJsonNormalizer();
+
+        self::assertSame($sorted, $normalizer->normalize($unsorted));
+        self::assertSame($sorted, $normalizer->normalize($sorted));
+    }
+
+    /**
+     * @param list<string> $input
+     * @param list<string> $expected
+     */
+    #[DataProvider('provideCases')]
+    public function testNormalize(
+        array $input,
+        array $expected,
+    ): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+
+        self::assertSame(
+            implode("\n", $expected) . "\n",
+            $normalizer->normalize(implode("\n", $input)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{list<string>, list<string>}>
+     */
+    public static function provideCases(): iterable
+    {
+        yield 'root keys in schema order, unknown keys last in alphabetical order' => [
+            ['{', '    "z-custom": 1,', '    "a-custom": 2,', '    "require": {},', '    "name": "a/a"', '}'],
+            ['{', '    "name": "a/a",', '    "require": {},', '    "a-custom": 2,', '    "z-custom": 1', '}'],
+        ];
+
+        yield 'package links like composer sort-packages' => [
+            ['{', '    "require": {', '        "b/b": "1",', '        "a/a10": "1",', '        "a/a9": "1",', '        "ext-json": "*",', '        "php": "^8.1"', '    }', '}'],
+            ['{', '    "require": {', '        "php": "^8.1",', '        "ext-json": "*",', '        "a/a9": "1",', '        "a/a10": "1",', '        "b/b": "1"', '    }', '}'],
+        ];
+
+        yield 'nested objects in alphabetical order, numbers as ksort()' => [
+            ['{', '    "extra": {', '        "b": {', '            "10": 1,', '            "9": 2,', '            "a": 3', '        },', '        "a": 1', '    }', '}'],
+            ['{', '    "extra": {', '        "a": 1,', '        "b": {', '            "9": 2,', '            "10": 1,', '            "a": 3', '        }', '    }', '}'],
+        ];
+
+        yield 'lists keep their order, except bin' => [
+            ['{', '    "keywords": ["b", "a"],', '    "bin": ["bin/b", "bin/a"]', '}'],
+            ['{', '    "keywords": [', '        "b",', '        "a"', '    ],', '    "bin": [', '        "bin/a",', '        "bin/b"', '    ]', '}'],
+        ];
+
+        yield 'allow-plugins with wildcard after the keys it matches' => [
+            ['{', '    "config": {', '        "allow-plugins": {', '            "b/*": true,', '            "a/a": true,', '            "b/b": false', '        }', '    }', '}'],
+            ['{', '    "config": {', '        "allow-plugins": {', '            "a/a": true,', '            "b/b": false,', '            "b/*": true', '        }', '    }', '}'],
+        ];
+
+        yield 'allow-plugins with wildcard in the middle keeps order' => [
+            ['{', '    "config": {', '        "allow-plugins": {', '            "b/*-plugin": true,', '            "a/a": true', '        }', '    }', '}'],
+            ['{', '    "config": {', '        "allow-plugins": {', '            "b/*-plugin": true,', '            "a/a": true', '        }', '    }', '}'],
+        ];
+
+        yield 'order-sensitive objects keep order' => [
+            ['{', '    "repositories": {', '        "z": {"url": "../z", "type": "path"},', '        "a": false', '    },', '    "scripts": {"auto-scripts": {"z": "x", "a": "x"}}', '}'],
+            ['{', '    "repositories": {', '        "z": {', '            "type": "path",', '            "url": "../z"', '        },', '        "a": false', '    },', '    "scripts": {', '        "auto-scripts": {', '            "z": "x",', '            "a": "x"', '        }', '    }', '}'],
+        ];
+
+        yield 'scripts: events first, then other scripts in alphabetical order' => [
+            ['{', '    "scripts": {', '        "test": "phpunit",', '        "post-update-cmd": "x",', '        "build": "x",', '        "post-install-cmd": "x"', '    }', '}'],
+            ['{', '    "scripts": {', '        "post-install-cmd": "x",', '        "post-update-cmd": "x",', '        "build": "x",', '        "test": "phpunit"', '    }', '}'],
+        ];
+
+        yield 'values are kept' => [
+            ['{"extra": {"float": 1.0, "unicode": "é", "slash": "a\/b", "object": {}, "list": [], "0": "zero", "": "empty"}}'],
+            ['{', '    "extra": {', '        "": "empty",', '        "0": "zero",', '        "float": 1.0,', '        "list": [],', '        "object": {},', '        "slash": "a/b",', '        "unicode": "é"', '    }', '}'],
+        ];
+
+        yield 'empty object' => [
+            ['{}'],
+            ['{}'],
+        ];
+    }
+
+    #[DataProvider('provideIndents')]
+    public function testKeepsIndent(string $indent): void
+    {
+        $input = "{\n{$indent}\"require\": {\n{$indent}{$indent}\"b/b\": \"1\",\n{$indent}{$indent}\"a/a\": \"1\"\n{$indent}},\n{$indent}\"name\": \"a/a\"\n}\n";
+        $expected = "{\n{$indent}\"name\": \"a/a\",\n{$indent}\"require\": {\n{$indent}{$indent}\"a/a\": \"1\",\n{$indent}{$indent}\"b/b\": \"1\"\n{$indent}}\n}\n";
+
+        $normalizer = new ComposerJsonNormalizer();
+
+        self::assertSame($expected, $normalizer->normalize($input));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideIndents(): iterable
+    {
+        yield 'two spaces' => ['  '];
+        yield 'four spaces' => ['    '];
+        yield 'tab' => ["\t"];
+    }
+
+    #[DataProvider('provideNewLines')]
+    public function testKeepsNewLine(string $newLine): void
+    {
+        $input = "{\n    \"require\": {},\n    \"name\": \"a/a\"\n}\n";
+        $expected = "{\n    \"name\": \"a/a\",\n    \"require\": {}\n}\n";
+
+        $normalizer = new ComposerJsonNormalizer();
+
+        self::assertSame(
+            str_replace("\n", $newLine, $expected),
+            $normalizer->normalize(str_replace("\n", $newLine, $input)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideNewLines(): iterable
+    {
+        yield 'LF' => ["\n"];
+        yield 'CRLF' => ["\r\n"];
+        yield 'CR' => ["\r"];
+    }
+
+    public function testAddsFinalNewLine(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+
+        self::assertSame("{\n    \"name\": \"a/a\"\n}\n", $normalizer->normalize("{\n    \"name\": \"a/a\"\n}"));
+    }
+
+    public function testInvalidJson(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+
+        $this->expectException(InvalidComposerJsonException::class);
+        $this->expectExceptionMessage('Invalid JSON: Syntax error');
+
+        $normalizer->normalize('{"name": ');
+    }
+
+    public function testJsonWithoutObject(): void
+    {
+        $normalizer = new ComposerJsonNormalizer();
+
+        $this->expectException(InvalidComposerJsonException::class);
+        $this->expectExceptionMessage('Expected a JSON object at the top level');
+
+        $normalizer->normalize('[]');
+    }
+
+}
