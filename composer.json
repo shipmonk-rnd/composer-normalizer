@@ -1,0 +1,78 @@
+{
+    "name": "shipmonk/composer-normalizer",
+    "description": "Zero-dependency normalizer of composer.json: sorts keys in a stable order and keeps your indentation.",
+    "license": [
+        "MIT"
+    ],
+    "keywords": [
+        "dev",
+        "composer",
+        "composer.json",
+        "normalize",
+        "sort",
+        "linter"
+    ],
+    "require": {
+        "php": "^8.1",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "editorconfig-checker/editorconfig-checker": "^10.7.0",
+        "phpstan/phpstan": "^2.2.14",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "phpunit/phpunit": "^10.5.62",
+        "shipmonk/coding-standard": "^0.3.0",
+        "shipmonk/composer-dependency-analyser": "^1.8",
+        "shipmonk/dead-code-detector": "^1.0",
+        "shipmonk/name-collision-detector": "^2.1.1",
+        "shipmonk/phpstan-rules": "^4.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "ShipMonk\\ComposerNormalizer\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ShipMonk\\ComposerNormalizer\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/composer-normalizer"
+    ],
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": false
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "check": [
+            "@check:composer",
+            "@check:ec",
+            "@check:cs",
+            "@check:types",
+            "@check:tests",
+            "@check:dependencies",
+            "@check:collisions"
+        ],
+        "check:collisions": "detect-collisions src tests",
+        "check:composer": [
+            "composer validate --strict",
+            "composer dump-autoload -o --strict-psr"
+        ],
+        "check:cs": [
+            "bin/composer-normalizer --dry-run",
+            "phpcs"
+        ],
+        "check:dependencies": "composer-dependency-analyser",
+        "check:ec": "ec bin src tests",
+        "check:tests": "phpunit",
+        "check:types": "phpstan analyse -vv --ansi",
+        "fix:cs": [
+            "bin/composer-normalizer",
+            "phpcbf"
+        ]
+    }
+}
