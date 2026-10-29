@@ -73,8 +73,8 @@ final class ComposerJsonNormalizerTest extends TestCase
         ];
 
         yield 'extension names in lowercase, duplicates merged' => [
-            ['{"require": {"ext-JSON": "^1.0", "php": "^8.1", "ext-json": "^2.0", "ext-Zend OPcache": "*", "Vendor/Package": "^1.0"}}'],
-            ['{', '    "require": {', '        "php": "^8.1",', '        "ext-json": "^1.0 || ^2.0",', '        "ext-zend-opcache": "*",', '        "Vendor/Package": "^1.0"', '    }', '}'],
+            ['{"require": {"ext-JSON": "^2.0", "php": "^8.1", "ext-json": "^1.0", "ext-Zend OPcache": "*", "Vendor/Package": "^1.0"}}'],
+            ['{', '    "require": {', '        "php": "^8.1",', '        "ext-json": "^2.0 || ^1.0",', '        "ext-zend-opcache": "*",', '        "Vendor/Package": "^1.0"', '    }', '}'],
         ];
 
         yield 'same values of duplicate extension names merged into one' => [
@@ -82,9 +82,24 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "conflict": {', '        "ext-json": "<1 || >3"', '    }', '}'],
         ];
 
+        yield 'duplicate extension names in suggest merged' => [
+            ['{"suggest": {"ext-Redis": "for cache", "ext-redis": "for cache", "EXT-REDIS": "for sessions"}}'],
+            ['{', '    "suggest": {', '        "ext-redis": "for cache || for sessions"', '    }', '}'],
+        ];
+
         yield 'duplicate extension names with other values than strings stay' => [
-            ['{"require": {"ext-json": 1, "ext-JSON": "*", "ext-MBSTRING": "*"}}'],
-            ['{', '    "require": {', '        "ext-JSON": "*",', '        "ext-json": 1,', '        "ext-mbstring": "*"', '    }', '}'],
+            ['{"require": {"ext-json": 1, "ext-JSON": "*", "ext-MBSTRING": "*", "ext-INTL": true}}'],
+            ['{', '    "require": {', '        "ext-JSON": "*",', '        "ext-intl": true,', '        "ext-json": 1,', '        "ext-mbstring": "*"', '    }', '}'],
+        ];
+
+        yield 'duplicate extension names with self.version stay' => [
+            ['{"replace": {"ext-json": "^1.0", "ext-JSON": "self.version"}}'],
+            ['{', '    "replace": {', '        "ext-JSON": "self.version",', '        "ext-json": "^1.0"', '    }', '}'],
+        ];
+
+        yield 'names of other packages stay' => [
+            ['{"require": {"EXT-": "*", "PHP": "^8.1", "lib-ICU": "*"}}'],
+            ['{', '    "require": {', '        "lib-ICU": "*",', '        "PHP": "^8.1",', '        "EXT-": "*"', '    }', '}'],
         ];
 
         yield 'extension names outside of package links stay' => [
