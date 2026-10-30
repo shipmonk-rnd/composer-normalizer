@@ -36,8 +36,8 @@ use const PHP_OS_FAMILY;
 final class ApplicationTest extends TestCase
 {
 
-    private const NORMALIZED = "{\n    \"name\": \"a/a\",\n    \"require\": {}\n}\n";
-    private const NOT_NORMALIZED = "{\n    \"require\": {},\n    \"name\": \"a/a\"\n}\n";
+    private const NORMALIZED = "{\n    \"name\": \"a/a\",\n    \"type\": \"library\"\n}\n";
+    private const NOT_NORMALIZED = "{\n    \"type\": \"library\",\n    \"name\": \"a/a\"\n}\n";
 
     private string $tempDir;
 

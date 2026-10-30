@@ -1,6 +1,6 @@
 {
     "name": "shipmonk/composer-normalizer",
-    "description": "Zero-dependency normalizer of composer.json: sorts keys in a stable order and keeps your indentation.",
+    "description": "Zero-dependency normalizer of composer.json: sorts keys in a stable order, removes empty keys and keeps your indentation.",
     "license": [
         "MIT"
     ],

@@ -27,6 +27,7 @@
     "prefer-stable": true,
     "zzz-custom": true,
     "autoload-dev": {
+        "files": [],
         "classmap": [
             "tests/_fixtures"
         ],
@@ -43,6 +44,7 @@
         "symfony/polyfill-php80": "*"
     },
     "config": {
+        "http-basic": {},
         "allow-plugins": {
             "a/*": false,
             "a/b": false,
@@ -191,6 +193,7 @@
     "license": "MIT",
     "_comment": "comment",
     "scripts": {
+        "post-autoload-dump": [],
         "auto-scripts": {
             "a": "symfony-cmd",
             "z": "symfony-cmd"

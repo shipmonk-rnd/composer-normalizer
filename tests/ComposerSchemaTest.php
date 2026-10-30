@@ -11,8 +11,10 @@ use function array_pop;
 use function array_reverse;
 use function count;
 use function file_get_contents;
+use function fnmatch;
 use function get_object_vars;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_string;
 use function json_decode;
@@ -22,10 +24,11 @@ use function strcmp;
 use function strlen;
 use function substr;
 use function usort;
+use const FNM_PATHNAME;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Checks the key order of every object that the Composer schema defines.
+ * Checks the key order and the removal of empty keys of every object that the Composer schema defines.
  *
  * tests/data/composer-schema.json is res/composer-schema.json of composer/composer (MIT license),
  * commit c1722067b98b from 2026-10-22.
@@ -34,6 +37,18 @@ final class ComposerSchemaTest extends TestCase
 {
 
     private const MAX_DEPTH = 20;
+
+    /**
+     * Composer reads an empty value of these keys differently from a missing key.
+     */
+    private const KEEP_EMPTY = [
+        'repositories/*/only',
+        'repositories/*/only-branches',
+        'config/github-protocols',
+        'config/forgejo-domains',
+        'config/policy',
+        'config/policy/*',
+    ];
 
     /**
      * @param list<string> $path * is an object key, # is a list item
@@ -66,27 +81,116 @@ final class ComposerSchemaTest extends TestCase
      */
     public static function provideKeyOrders(): array
     {
+        $keyOrders = [];
+
+        foreach (self::collectObjects() as $name => [$path, $properties]) {
+            $keyOrders[$name] = [$path, array_keys($properties)];
+        }
+
+        return $keyOrders;
+    }
+
+    /**
+     * @param list<string> $path * is an object key, # is a list item
+     * @param array<string, stdClass|list<never>> $emptyValues
+     * @param list<string> $keptKeys
+     */
+    #[DataProvider('provideEmptyValues')]
+    public function testRemovesEmptyOptionalKeys(
+        array $path,
+        array $emptyValues,
+        array $keptKeys,
+    ): void
+    {
+        $object = new stdClass();
+        $object->{'x-custom'} = true; // keeps the object
+
+        foreach ($emptyValues as $key => $emptyValue) {
+            $object->{$key} = $emptyValue;
+        }
+
+        $normalizer = new ComposerJsonNormalizer();
+        $normalized = $normalizer->normalize(json_encode(self::wrap($object, $path), JSON_THROW_ON_ERROR));
+
+        self::assertEqualsCanonicalizing(['x-custom', ...$keptKeys], array_keys(get_object_vars(self::unwrap(json_decode($normalized, flags: JSON_THROW_ON_ERROR), $path))));
+    }
+
+    /**
+     * @return array<string, array{list<string>, array<string, stdClass|list<never>>, list<string>}>
+     */
+    public static function provideEmptyValues(): array
+    {
+        $cases = [];
+
+        foreach (self::collectObjects() as $name => [$path, $properties, $required]) {
+            $emptyValues = [];
+            $keptKeys = [];
+
+            foreach ($properties as $key => $types) {
+                if (in_array('object', $types, true)) {
+                    $emptyValues[$key] = new stdClass();
+                } elseif (in_array('array', $types, true)) {
+                    $emptyValues[$key] = [];
+                } else {
+                    continue;
+                }
+
+                if (in_array($key, $required, true) || self::matchesAny(implode('/', [...$path, $key]), self::KEEP_EMPTY)) {
+                    $keptKeys[] = $key;
+                }
+            }
+
+            if ($emptyValues !== []) {
+                $cases[$name] = [$path, $emptyValues, $keptKeys];
+            }
+        }
+
+        return $cases;
+    }
+
+    /**
+     * @param list<string> $patterns
+     */
+    private static function matchesAny(
+        string $keyPath,
+        array $patterns,
+    ): bool
+    {
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, $keyPath, FNM_PATHNAME)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<string, array{list<string>, array<string, list<string>>, list<string>}> path, types of each key, required keys
+     */
+    private static function collectObjects(): array
+    {
         $schema = json_decode((string) file_get_contents(__DIR__ . '/data/composer-schema.json'), flags: JSON_THROW_ON_ERROR);
 
         if (!$schema instanceof stdClass) {
             throw new LogicException('Schema is not an object');
         }
 
-        $keyOrders = [];
-        self::collectKeyOrders($schema, $schema, [], $keyOrders);
+        $objects = [];
+        self::collectObjectsAt($schema, $schema, [], $objects);
 
-        return $keyOrders;
+        return $objects;
     }
 
     /**
      * @param list<string> $path
-     * @param array<string, array{list<string>, list<string>}> $keyOrders
+     * @param array<string, array{list<string>, array<string, list<string>>, list<string>}> $objects
      */
-    private static function collectKeyOrders(
+    private static function collectObjectsAt(
         stdClass $schema,
         mixed $node,
         array $path,
-        array &$keyOrders,
+        array &$objects,
     ): void
     {
         if (count($path) > self::MAX_DEPTH) {
@@ -103,34 +207,77 @@ final class ComposerSchemaTest extends TestCase
             $branches = $node->{$keyword} ?? [];
 
             foreach (is_array($branches) ? $branches : [] as $branch) {
-                self::collectKeyOrders($schema, $branch, $path, $keyOrders);
+                self::collectObjectsAt($schema, $branch, $path, $objects);
             }
         }
 
         $properties = $node->properties ?? null;
 
         if ($properties instanceof stdClass) {
-            $keys = [];
+            $types = [];
 
             foreach (get_object_vars($properties) as $key => $propertySchema) {
-                $keys[] = (string) $key;
-                self::collectKeyOrders($schema, $propertySchema, [...$path, (string) $key], $keyOrders);
+                $types[(string) $key] = self::getTypes($schema, $propertySchema);
+                self::collectObjectsAt($schema, $propertySchema, [...$path, (string) $key], $objects);
             }
 
-            $keyOrders[($path === [] ? '(root)' : implode('/', $path)) . ': ' . implode(', ', $keys)] = [$path, $keys];
+            $objects[($path === [] ? '(root)' : implode('/', $path)) . ': ' . implode(', ', array_keys($types))] = [$path, $types, self::getStrings($node->required ?? [])];
         }
 
         $items = $node->items ?? null;
 
         if ($items instanceof stdClass) {
-            self::collectKeyOrders($schema, $items, [...$path, '#'], $keyOrders);
+            self::collectObjectsAt($schema, $items, [...$path, '#'], $objects);
         }
 
         $additionalProperties = $node->additionalProperties ?? null;
 
         if ($additionalProperties instanceof stdClass) {
-            self::collectKeyOrders($schema, $additionalProperties, [...$path, '*'], $keyOrders);
+            self::collectObjectsAt($schema, $additionalProperties, [...$path, '*'], $objects);
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function getTypes(
+        stdClass $schema,
+        mixed $node,
+    ): array
+    {
+        $node = self::resolveReference($schema, $node);
+
+        if (!$node instanceof stdClass) {
+            return [];
+        }
+
+        $types = self::getStrings($node->type ?? []);
+
+        foreach (['anyOf', 'oneOf'] as $keyword) {
+            $branches = $node->{$keyword} ?? [];
+
+            foreach (is_array($branches) ? $branches : [] as $branch) {
+                $types = [...$types, ...self::getTypes($schema, $branch)];
+            }
+        }
+
+        return $types;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function getStrings(mixed $value): array
+    {
+        $strings = [];
+
+        foreach (is_array($value) ? $value : [$value] as $item) {
+            if (is_string($item)) {
+                $strings[] = $item;
+            }
+        }
+
+        return $strings;
     }
 
     private static function resolveReference(

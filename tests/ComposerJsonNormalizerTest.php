@@ -48,8 +48,8 @@ final class ComposerJsonNormalizerTest extends TestCase
     public static function provideCases(): iterable
     {
         yield 'root keys in schema order, unknown keys last in alphabetical order' => [
-            ['{', '    "z-custom": 1,', '    "a-custom": 2,', '    "require": {},', '    "name": "a/a"', '}'],
-            ['{', '    "name": "a/a",', '    "require": {},', '    "a-custom": 2,', '    "z-custom": 1', '}'],
+            ['{', '    "z-custom": 1,', '    "a-custom": 2,', '    "type": "library",', '    "name": "a/a"', '}'],
+            ['{', '    "name": "a/a",', '    "type": "library",', '    "a-custom": 2,', '    "z-custom": 1', '}'],
         ];
 
         yield 'package links like composer sort-packages' => [
@@ -117,6 +117,36 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "extra": {', '        "0": "zero",', '        "": "empty",', '        "float": 1.0,', '        "list": [],', '        "object": {},', '        "slash": "a/b",', '        "unicode": "é"', '    }', '}'],
         ];
 
+        yield 'empty optional keys are removed' => [
+            ['{"keywords": [], "require-dev": {}, "autoload": {"psr-4": {}}, "config": {"platform": {}}, "scripts": {"post-install-cmd": [], "test": []}, "extra": {"a": {}}}'],
+            ['{', '    "extra": {', '        "a": {}', '    },', '    "scripts": {', '        "test": []', '    }', '}'],
+        ];
+
+        yield 'empty values stay where Composer reads them differently from a missing key' => [
+            ['{"repositories": [{"type": "composer", "url": "https://a", "only": [], "options": {}}], "config": {"github-protocols": [], "policy": {"advisories": {}, "malware": {}}}}'],
+            ['{', '    "repositories": [', '        {', '            "type": "composer",', '            "url": "https://a",', '            "only": []', '        }', '    ],', '    "config": {', '        "github-protocols": [],', '        "policy": {', '            "advisories": {},', '            "malware": {}', '        }', '    }', '}'],
+        ];
+
+        yield 'kept empty value after its content is removed' => [
+            ['{"config": {"policy": {"advisories": {"ignore": {}}}}}'],
+            ['{', '    "config": {', '        "policy": {', '            "advisories": {}', '        }', '    }', '}'],
+        ];
+
+        yield 'config keys that the schema does not define stay empty' => [
+            ['{"config": {"x-custom": [], "0": {}, "platform": {}}}'],
+            ['{', '    "config": {', '        "0": {},', '        "x-custom": []', '    }', '}'],
+        ];
+
+        yield 'list items and keys of order-sensitive objects stay empty' => [
+            ['{"authors": [{}], "extra": {"installer-paths": {}}, "scripts": {"auto-scripts": {}}}'],
+            ['{', '    "authors": [', '        {}', '    ],', '    "extra": {', '        "installer-paths": {}', '    },', '    "scripts": {', '        "auto-scripts": {}', '    }', '}'],
+        ];
+
+        yield 'null values stay' => [
+            ['{"require-dev": null}'],
+            ['{', '    "require-dev": null', '}'],
+        ];
+
         yield 'line terminators stay unescaped' => [
             ["{\"description\": \"a\u{2028}b\\u2029c\"}"],
             ['{', "    \"description\": \"a\u{2028}b\u{2029}c\"", '}'],
@@ -152,8 +182,8 @@ final class ComposerJsonNormalizerTest extends TestCase
     #[DataProvider('provideNewLines')]
     public function testKeepsNewLine(string $newLine): void
     {
-        $input = "{\n  \"require\": {},\n  \"name\": \"a/a\"\n}\n";
-        $expected = "{\n  \"name\": \"a/a\",\n  \"require\": {}\n}\n";
+        $input = "{\n  \"type\": \"library\",\n  \"name\": \"a/a\"\n}\n";
+        $expected = "{\n  \"name\": \"a/a\",\n  \"type\": \"library\"\n}\n";
 
         $normalizer = new ComposerJsonNormalizer();
 
