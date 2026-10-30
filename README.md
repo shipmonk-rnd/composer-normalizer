@@ -52,11 +52,12 @@ Without a file, it uses the file from the `COMPOSER` environment variable, the s
 ## Key order
 
 - **Root keys** use the order of the [Composer schema](https://getcomposer.org/schema.json): `name`, `description`, `license`, `type`, ..., `config`, `extra`, `scripts`. Unknown keys go last, in alphabetical order.
-- **Packages** in `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest` use the order of Composer's [`sort-packages`](https://getcomposer.org/doc/06-config.md#sort-packages): `php`, `ext-*`, `lib-*`, `composer` and its API packages, then other packages.
+- **Packages** in `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest` use the order of Composer's [`sort-packages`](https://getcomposer.org/doc/06-config.md#sort-packages): `php`, `ext-*`, `lib-*`, `composer` and its API packages, then other packages. Unmerged names that differ only in case keep their relative order.
 - **Objects that the schema defines** use the schema order, for example `authors`, `support`, `autoload`, `source`, `dist`, items of `repositories` (also inline packages), `archive`, `php-ext`, `config.audit`, `config.policy` and `config.http-basic`. In `scripts`, Composer events (`post-install-cmd`, ...) go first, then your scripts in alphabetical order.
 - **All other objects** are sorted alphabetically, recursively: `config`, `extra`, `autoload.psr-4`, ... Numeric keys go first, by value (`9` before `10`).
 - **`config.allow-plugins` and `config.preferred-install`** are sorted alphabetically, but `vendor/*` goes after `vendor/package`. Composer uses the first entry that matches a package, so the order stays when sorting would change which entry matches.
 - **The order stays** where the order has a meaning: `repositories`, `extra.installer-paths`, `extra.patches.*`, `scripts.auto-scripts` and all lists, except `bin`, `repositories.*.only` and `repositories.*.exclude`.
+- **`bin`** is sorted only when the binaries have distinct destination names, including case-insensitive names and `.bat` proxies on Windows. Otherwise, the order stays: Composer installs the first binary with a given name.
 
 ## Empty keys
 
@@ -84,7 +85,7 @@ In `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest`, nam
 }
 ```
 
-becomes `"ext-json": "^1.0 || ^2.0"`. When one of the values is not a string or is `self.version`, the values cannot be joined and these names stay as they are.
+becomes `"ext-json": "^1.0 || ^2.0"`. When one of the values is not a string or is `self.version`, the values cannot be joined and these names keep their spelling and relative order, so Composer still uses the same last entry.
 
 The merge can change what Composer does. Composer uses only the last of the duplicate names (in `suggest`, it shows all of them). After the merge, `require` allows more versions and `conflict` blocks more versions. A new name can also make `composer validate` show a problem that the old name hid, for example `ext-json` in `replace` and `ext-JSON` in `conflict`. Check the result with `composer validate`.
 
@@ -101,7 +102,9 @@ The merge can change what Composer does. Composer uses only the last of the dupl
 The key order is the same as in `ergebnis/composer-normalize` 2.55, except:
 
 - `composer` goes with the platform packages, the same as when `composer require` sorts packages.
+- Unmerged package names that differ only in case keep their relative order.
 - `config.allow-plugins` and `config.preferred-install` keep their order when sorting would change which entry matches a package.
+- `bin` keeps its order when destination names conflict, including Windows names and `.bat` proxies.
 - Numeric keys always go before other keys.
 - Repositories use one key order for all repository types. ergebnis puts keys that the schema does not define for the repository type last, for example `options` in a `vcs` repository. In repositories in object form (`"repositories": {"name": {...}}`), ergebnis sorts all keys alphabetically.
 
@@ -114,7 +117,7 @@ Empty keys are removed the same as in ergebnis, except:
 Extension names change the same as in ergebnis, except:
 
 - The joined values keep the order of the file, and equal values are written once. ergebnis also normalizes the joined version constraints (when it can parse them, it sorts and simplifies them), and joins the descriptions in `suggest` with `||`.
-- Values with `self.version` are not joined.
+- Values with `self.version` are not joined. Duplicate extension names that cannot be joined keep their relative order.
 
 A `composer.json` that ergebnis normalized does not change, except in the cases above and when the file has no final new line, escaped slashes (`\/`) or escaped unicode characters (`\u00e9`).
 

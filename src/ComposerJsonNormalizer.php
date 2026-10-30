@@ -10,6 +10,7 @@ use function array_keys;
 use function array_slice;
 use function array_unique;
 use function array_values;
+use function basename;
 use function count;
 use function explode;
 use function get_object_vars;
@@ -27,6 +28,7 @@ use function preg_replace;
 use function preg_replace_callback;
 use function rtrim;
 use function str_contains;
+use function str_ends_with;
 use function str_repeat;
 use function str_replace;
 use function str_starts_with;
@@ -526,7 +528,7 @@ final class ComposerJsonNormalizer
             $normalized[] = $this->normalizeValue($item, [...$path, $index]);
         }
 
-        if (self::matchesAny($path, self::SORTED_LISTS) && self::containsOnlyStrings($normalized)) {
+        if (self::matchesAny($path, self::SORTED_LISTS) && self::containsOnlyStrings($normalized) && self::canSortBinaries($normalized)) {
             usort($normalized, strcmp(...));
         }
 
@@ -554,6 +556,34 @@ final class ComposerJsonNormalizer
     }
 
     /**
+     * Composer installs the first binary with a given basename. Windows also has case-insensitive names and .bat proxies.
+     * Check all platforms so normalization does not depend on the operating system.
+     *
+     * @param list<string> $binaries
+     */
+    private static function canSortBinaries(array $binaries): bool
+    {
+        $targets = [];
+
+        foreach ($binaries as $binary) {
+            $name = basename(str_replace('\\', '/', $binary));
+            $names = str_ends_with($name, '.bat') ? [$name] : [$name, $name . '.bat'];
+
+            foreach ($names as $targetName) {
+                $target = strtolower($targetName);
+
+                if (isset($targets[$target])) {
+                    return false;
+                }
+
+                $targets[$target] = true;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @param array<int|string, mixed> $properties numeric keys are int
      * @param list<int|string> $path
      * @return array<int|string, mixed>
@@ -568,7 +598,29 @@ final class ComposerJsonNormalizer
         }
 
         if (self::matchesAny($path, self::PACKAGE_LINKS)) {
-            uksort($properties, static fn (int|string $a, int|string $b): int => strnatcmp(self::getPackageSortKey((string) $a), self::getPackageSortKey((string) $b)));
+            $namesByLowercase = [];
+
+            foreach (array_keys($properties) as $name) {
+                $normalizedName = (string) self::normalizeExtensionName($name);
+                $namesByLowercase[strtolower($normalizedName)][] = $name;
+            }
+
+            $sortKeys = [];
+
+            foreach ($namesByLowercase as $lowercaseName => $names) {
+                // Duplicates share a sort key, so stable sorting keeps Composer's last-wins order.
+                $sortName = count($names) > 1 ? $lowercaseName : (string) self::normalizeExtensionName($names[0]);
+                $sortKey = self::getPackageSortKey($sortName);
+
+                foreach ($names as $name) {
+                    $sortKeys[$name] = $sortKey;
+                }
+            }
+
+            uksort($properties, static fn (int|string $a, int|string $b): int => strnatcmp(
+                $sortKeys[$a] ?? throw new LogicException('Missing package sort key of ' . $a),
+                $sortKeys[$b] ?? throw new LogicException('Missing package sort key of ' . $b),
+            ));
             return $properties;
         }
 
