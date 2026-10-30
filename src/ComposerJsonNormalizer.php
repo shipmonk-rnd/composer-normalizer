@@ -8,9 +8,12 @@ use stdClass;
 use function array_flip;
 use function array_keys;
 use function array_slice;
+use function array_unique;
+use function array_values;
 use function count;
 use function explode;
 use function get_object_vars;
+use function implode;
 use function in_array;
 use function ini_set;
 use function intdiv;
@@ -31,6 +34,7 @@ use function strcmp;
 use function strlen;
 use function strnatcmp;
 use function strtolower;
+use function trim;
 use function uksort;
 use function usort;
 use const JSON_PRESERVE_ZERO_FRACTION;
@@ -42,7 +46,7 @@ use const JSON_UNESCAPED_UNICODE;
 use const PHP_INT_MAX;
 
 /**
- * Sorts keys of composer.json in the key order of ergebnis/composer-normalize and removes empty optional keys, README.md lists the differences.
+ * Sorts keys of composer.json in the key order of ergebnis/composer-normalize, removes empty optional keys and writes extension names in lowercase, README.md lists the differences.
  *
  * Paths below use / as separator, * matches any object key or list index, # matches any list index.
  */
@@ -405,8 +409,13 @@ final class ComposerJsonNormalizer
     ): stdClass
     {
         $normalized = new stdClass();
+        $properties = get_object_vars($object);
 
-        foreach ($this->sortProperties(get_object_vars($object), $path) as $key => $value) {
+        if (self::matchesAny($path, self::PACKAGE_LINKS)) {
+            $properties = self::normalizeExtensionNames($properties);
+        }
+
+        foreach ($this->sortProperties($properties, $path) as $key => $value) {
             $normalizedValue = $this->normalizeValue($value, [...$path, (string) $key]);
 
             if (self::isEmpty($normalizedValue) && self::isRemovableWhenEmpty($path, $key)) {
@@ -437,6 +446,68 @@ final class ComposerJsonNormalizer
         $schemaKeys = $path === ['config'] ? self::CONFIG_OBJECT_AND_LIST_KEYS : self::getSchemaKeyOrder($path);
 
         return in_array($key, $schemaKeys, true) && !self::matchesAny([...$path, $key], self::KEEP_EMPTY);
+    }
+
+    /**
+     * Same as ergebnis/composer-normalize: ext-JSON becomes ext-json, values of duplicate names are joined with ||.
+     * Composer also uses lowercase package names, but there the last duplicate wins.
+     *
+     * @param array<int|string, mixed> $packages
+     * @return array<int|string, mixed>
+     */
+    private static function normalizeExtensionNames(array $packages): array
+    {
+        $duplicatesByName = [];
+
+        foreach ($packages as $name => $value) {
+            $duplicatesByName[self::normalizeExtensionName($name)][$name] = $value;
+        }
+
+        $normalized = [];
+
+        foreach ($duplicatesByName as $name => $duplicates) {
+            $values = array_values($duplicates);
+
+            if (count($values) === 1) {
+                $normalized[$name] = $values[0];
+            } elseif (self::canJoin($values)) {
+                $normalized[$name] = implode(' || ', array_unique($values));
+            } else {
+                $normalized += $duplicates; // the names stay
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Lowercase with - instead of spaces, same as Composer\Repository\PlatformRepository::buildPackageName()
+     */
+    private static function normalizeExtensionName(int|string $name): int|string
+    {
+        if (!is_string($name) || preg_match('~^ext-.~is', $name) !== 1) {
+            return $name;
+        }
+
+        return str_replace(' ', '-', strtolower($name));
+    }
+
+    /**
+     * Composer reads self.version only as the whole value.
+     *
+     * @param list<mixed> $values
+     *
+     * @phpstan-assert-if-true list<string> $values
+     */
+    private static function canJoin(array $values): bool
+    {
+        foreach ($values as $value) {
+            if (!is_string($value) || trim($value) === 'self.version') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

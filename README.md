@@ -1,7 +1,7 @@
 # Composer normalizer - sort keys of composer.json and remove empty keys
 
 - 🪶 **Zero dependencies:** a small CLI, not a Composer plugin
-- 🔤 **Sorts keys:** the key order of [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), without changes to your values
+- 🔤 **Sorts keys:** the key order of [ergebnis/composer-normalize](https://github.com/ergebnis/composer-normalize), without changes to your values, except for [duplicate extension names](#extension-names)
 - 🧹 **Removes empty keys:** `"require-dev": {}`, `"keywords": []` and other empty optional keys
 - 📐 **Keeps your format:** indentation (spaces or tabs, any size) and new lines are taken from the file
 - ✨ **Compatible:** PHP 8.1+
@@ -71,11 +71,28 @@ An empty value stays where Composer reads it differently from a missing key:
 
 Composer applies `config` on top of the global config (`COMPOSER_HOME/config.json`). An empty `config.platform`, `config.secure-svn-domains`, `config.audit.ignore-severity` or `config.audit.ignore-abandoned` replaces the global value. The tool removes these empty values, so the global value applies again.
 
+## Extension names
+
+In `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest`, names that start with `ext-` (in any case) are written in lowercase, with `-` instead of spaces, the same as Composer names the packages of PHP extensions: `ext-JSON` becomes `ext-json`. When this gives the same name two or more times, the values are joined with ` || `, in the order of the file. Equal values are written once:
+
+```json
+{
+    "require": {
+        "ext-JSON": "^1.0",
+        "ext-json": "^2.0"
+    }
+}
+```
+
+becomes `"ext-json": "^1.0 || ^2.0"`. When one of the values is not a string or is `self.version`, the values cannot be joined and these names stay as they are.
+
+The merge can change what Composer does. Composer uses only the last of the duplicate names (in `suggest`, it shows all of them). After the merge, `require` allows more versions and `conflict` blocks more versions. A new name can also make `composer validate` show a problem that the old name hid, for example `ext-json` in `replace` and `ext-JSON` in `conflict`. Check the result with `composer validate`.
+
 ## Format and values
 
 - The output always ends with a new line.
 - Slashes and unicode characters are not escaped, the same as when Composer writes `composer.json`.
-- Values do not change, except where the JSON functions of PHP cannot keep them:
+- Values do not change, except for [duplicate extension names](#extension-names) and where the JSON functions of PHP cannot keep them:
   - numbers get their shortest form: `1e3` becomes `1000.0`, `1.50` becomes `1.5`, an integer larger than `PHP_INT_MAX` becomes a float
   - when an object has the same key two times, only the last one stays (Composer also uses the last one)
 
@@ -94,15 +111,20 @@ Empty keys are removed the same as in ergebnis, except:
 - Keys with the value `null` stay.
 - In repositories, empty keys of all repository types are removed, also in repositories in object form. ergebnis removes only empty keys that the schema defines for the repository type, and none in the object form.
 
+Extension names change the same as in ergebnis, except:
+
+- The joined values keep the order of the file, and equal values are written once. ergebnis also normalizes the joined version constraints (when it can parse them, it sorts and simplifies them), and joins the descriptions in `suggest` with `||`.
+- Values with `self.version` are not joined.
+
 A `composer.json` that ergebnis normalized does not change, except in the cases above and when the file has no final new line, escaped slashes (`\/`) or escaped unicode characters (`\u00e9`).
 
 This tool does **not**:
 
 - **register a Composer plugin**: there is no `composer normalize` command and no `allow-plugins` entry. The tool does not load Composer internals, so it does not block an upgrade of PHP or Composer.
-- **change values**: ergebnis also changes version constraints (`^1.0|^2.0` becomes `^1.0 || ^2.0`), writes `ext-JSON` as `ext-json` and `1.0` as `1`.
+- **change values** (except for [duplicate extension names](#extension-names)): ergebnis also changes version constraints (`^1.0|^2.0` becomes `^1.0 || ^2.0`) and writes `1.0` as `1`.
 - **show a diff**: run it without `--dry-run` and use `git diff`.
 - **validate the schema**: use `composer validate --strict`.
-- **update `composer.lock`**: the `content-hash` in `composer.lock` depends on `require`, `require-dev`, `conflict`, `replace`, `provide`, `repositories`, `extra`, `config.platform` and `config.policy`, also on their key order and empty values. When the tool changes them, run `composer update --lock`.
+- **update `composer.lock`**: the `content-hash` in `composer.lock` depends on `require`, `require-dev`, `conflict`, `replace`, `provide`, `repositories`, `extra`, `config.platform` and `config.policy`, also on their key order, empty values and package names. When the tool changes them, run `composer update --lock`.
 - **have indent options**: the indentation comes from the file.
 
 ### Migration
