@@ -89,12 +89,22 @@ final class ComposerJsonNormalizerTest extends TestCase
 
         yield 'duplicate extension names with other values than strings stay' => [
             ['{"require": {"ext-json": 1, "ext-JSON": "*", "ext-MBSTRING": "*", "ext-INTL": true}}'],
-            ['{', '    "require": {', '        "ext-JSON": "*",', '        "ext-intl": true,', '        "ext-json": 1,', '        "ext-mbstring": "*"', '    }', '}'],
+            ['{', '    "require": {', '        "ext-intl": true,', '        "ext-json": 1,', '        "ext-JSON": "*",', '        "ext-mbstring": "*"', '    }', '}'],
         ];
 
         yield 'duplicate extension names with self.version stay' => [
             ['{"replace": {"ext-json": "^1.0", "ext-JSON": "self.version"}}'],
+            ['{', '    "replace": {', '        "ext-json": "^1.0",', '        "ext-JSON": "self.version"', '    }', '}'],
+        ];
+
+        yield 'duplicate extension names keep order when self.version comes first' => [
+            ['{"replace": {"ext-JSON": "self.version", "ext-json": "^1.0"}}'],
             ['{', '    "replace": {', '        "ext-JSON": "self.version",', '        "ext-json": "^1.0"', '    }', '}'],
+        ];
+
+        yield 'unmerged extension groups sort without changing their internal order' => [
+            ['{"replace": {"z/z": "*", "ext-json": "^1.0", "php": "^8.1", "ext-MBSTRING": "self.version", "ext-JSON": "self.version", "ext-mbstring": "^2.0"}}'],
+            ['{', '    "replace": {', '        "php": "^8.1",', '        "ext-json": "^1.0",', '        "ext-JSON": "self.version",', '        "ext-MBSTRING": "self.version",', '        "ext-mbstring": "^2.0",', '        "z/z": "*"', '    }', '}'],
         ];
 
         yield 'names of other packages stay' => [
@@ -110,6 +120,31 @@ final class ComposerJsonNormalizerTest extends TestCase
         yield 'bin with other values than strings keeps order' => [
             ['{"bin": ["b", 1, "a"]}'],
             ['{', '    "bin": [', '        "b",', '        1,', '        "a"', '    ]', '}'],
+        ];
+
+        yield 'bin with conflicting basenames keeps order' => [
+            ['{"bin": ["scripts/tool", "bin/tool"]}'],
+            ['{', '    "bin": [', '        "scripts/tool",', '        "bin/tool"', '    ]', '}'],
+        ];
+
+        yield 'bin with conflicting basenames in the opposite order keeps order' => [
+            ['{"bin": ["bin/tool", "scripts/tool"]}'],
+            ['{', '    "bin": [', '        "bin/tool",', '        "scripts/tool"', '    ]', '}'],
+        ];
+
+        yield 'bin with case-insensitive basename conflicts keeps order' => [
+            ['{"bin": ["scripts/tool", "bin/TOOL"]}'],
+            ['{', '    "bin": [', '        "scripts/tool",', '        "bin/TOOL"', '    ]', '}'],
+        ];
+
+        yield 'bin with Windows path separator conflicts keeps order' => [
+            ['{"bin": ["scripts\\\\tool", "bin/tool"]}'],
+            ['{', '    "bin": [', '        "scripts\\\\tool",', '        "bin/tool"', '    ]', '}'],
+        ];
+
+        yield 'bin with Windows proxy conflicts keeps order' => [
+            ['{"bin": ["scripts/tool.bat", "bin/tool"]}'],
+            ['{', '    "bin": [', '        "scripts/tool.bat",', '        "bin/tool"', '    ]', '}'],
         ];
 
         yield 'lists keep their order, except bin' => [
