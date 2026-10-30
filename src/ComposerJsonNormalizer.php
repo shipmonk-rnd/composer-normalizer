@@ -566,10 +566,12 @@ final class ComposerJsonNormalizer
         $targets = [];
 
         foreach ($binaries as $binary) {
-            $name = strtolower(basename(str_replace('\\', '/', $binary)));
+            $name = basename(str_replace('\\', '/', $binary));
             $names = str_ends_with($name, '.bat') ? [$name] : [$name, $name . '.bat'];
 
-            foreach ($names as $target) {
+            foreach ($names as $targetName) {
+                $target = strtolower($targetName);
+
                 if (isset($targets[$target])) {
                     return false;
                 }
@@ -596,10 +598,28 @@ final class ComposerJsonNormalizer
         }
 
         if (self::matchesAny($path, self::PACKAGE_LINKS)) {
-            // Unmerged extension duplicates compare equally, so stable sorting keeps Composer's last-wins order.
+            $namesByLowercase = [];
+
+            foreach (array_keys($properties) as $name) {
+                $normalizedName = (string) self::normalizeExtensionName($name);
+                $namesByLowercase[strtolower($normalizedName)][] = $name;
+            }
+
+            $sortKeys = [];
+
+            foreach ($namesByLowercase as $lowercaseName => $names) {
+                // Duplicates share a sort key, so stable sorting keeps Composer's last-wins order.
+                $sortName = count($names) > 1 ? $lowercaseName : (string) self::normalizeExtensionName($names[0]);
+                $sortKey = self::getPackageSortKey($sortName);
+
+                foreach ($names as $name) {
+                    $sortKeys[$name] = $sortKey;
+                }
+            }
+
             uksort($properties, static fn (int|string $a, int|string $b): int => strnatcmp(
-                self::getPackageSortKey((string) self::normalizeExtensionName($a)),
-                self::getPackageSortKey((string) self::normalizeExtensionName($b)),
+                $sortKeys[$a] ?? throw new LogicException('Missing package sort key of ' . $a),
+                $sortKeys[$b] ?? throw new LogicException('Missing package sort key of ' . $b),
             ));
             return $properties;
         }

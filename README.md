@@ -52,7 +52,7 @@ Without a file, it uses the file from the `COMPOSER` environment variable, the s
 ## Key order
 
 - **Root keys** use the order of the [Composer schema](https://getcomposer.org/schema.json): `name`, `description`, `license`, `type`, ..., `config`, `extra`, `scripts`. Unknown keys go last, in alphabetical order.
-- **Packages** in `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest` use the order of Composer's [`sort-packages`](https://getcomposer.org/doc/06-config.md#sort-packages): `php`, `ext-*`, `lib-*`, `composer` and its API packages, then other packages.
+- **Packages** in `require`, `require-dev`, `conflict`, `provide`, `replace` and `suggest` use the order of Composer's [`sort-packages`](https://getcomposer.org/doc/06-config.md#sort-packages): `php`, `ext-*`, `lib-*`, `composer` and its API packages, then other packages. Unmerged names that differ only in case keep their relative order.
 - **Objects that the schema defines** use the schema order, for example `authors`, `support`, `autoload`, `source`, `dist`, items of `repositories` (also inline packages), `archive`, `php-ext`, `config.audit`, `config.policy` and `config.http-basic`. In `scripts`, Composer events (`post-install-cmd`, ...) go first, then your scripts in alphabetical order.
 - **All other objects** are sorted alphabetically, recursively: `config`, `extra`, `autoload.psr-4`, ... Numeric keys go first, by value (`9` before `10`).
 - **`config.allow-plugins` and `config.preferred-install`** are sorted alphabetically, but `vendor/*` goes after `vendor/package`. Composer uses the first entry that matches a package, so the order stays when sorting would change which entry matches.
@@ -102,6 +102,7 @@ The merge can change what Composer does. Composer uses only the last of the dupl
 The key order is the same as in `ergebnis/composer-normalize` 2.55, except:
 
 - `composer` goes with the platform packages, the same as when `composer require` sorts packages.
+- Unmerged package names that differ only in case keep their relative order.
 - `config.allow-plugins` and `config.preferred-install` keep their order when sorting would change which entry matches a package.
 - `bin` keeps its order when destination names conflict, including Windows names and `.bat` proxies.
 - Numeric keys always go before other keys.

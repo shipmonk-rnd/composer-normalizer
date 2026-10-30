@@ -62,6 +62,21 @@ final class ComposerJsonNormalizerTest extends TestCase
             ['{', '    "require": {', '        "php": "^8.1",', '        "composer": "^2",', '        "composer-runtime-api": "^2",', '        "b/b": "1"', '    }', '}'],
         ];
 
+        yield 'case-only PHP duplicates keep their order' => [
+            ['{"require": {"PHP": "^7.4", "php": ">=8.1"}}'],
+            ['{', '    "require": {', '        "PHP": "^7.4",', '        "php": ">=8.1"', '    }', '}'],
+        ];
+
+        yield 'case-only PHP duplicates keep the opposite order' => [
+            ['{"require": {"php": ">=8.1", "PHP": "^7.4"}}'],
+            ['{', '    "require": {', '        "php": ">=8.1",', '        "PHP": "^7.4"', '    }', '}'],
+        ];
+
+        yield 'case-only platform groups sort without changing their internal order' => [
+            ['{"require": {"composer-runtime-api": "^2", "lib-icu": "^70", "hhvm": "^4", "PHP": "^7.4", "COMPOSER-RUNTIME-API": "^1", "lib-ICU": "^60", "HHVM": "^3", "php": ">=8.1"}}'],
+            ['{', '    "require": {', '        "PHP": "^7.4",', '        "php": ">=8.1",', '        "hhvm": "^4",', '        "HHVM": "^3",', '        "lib-icu": "^70",', '        "lib-ICU": "^60",', '        "composer-runtime-api": "^2",', '        "COMPOSER-RUNTIME-API": "^1"', '    }', '}'],
+        ];
+
         yield 'nested objects in alphabetical order, numbers as ksort()' => [
             ['{', '    "extra": {', '        "b": {', '            "10": 1,', '            "9": 2,', '            "a": 3', '        },', '        "a": 1', '    }', '}'],
             ['{', '    "extra": {', '        "a": 1,', '        "b": {', '            "9": 2,', '            "10": 1,', '            "a": 3', '        }', '    }', '}'],
@@ -145,6 +160,16 @@ final class ComposerJsonNormalizerTest extends TestCase
         yield 'bin with Windows proxy conflicts keeps order' => [
             ['{"bin": ["scripts/tool.bat", "bin/tool"]}'],
             ['{', '    "bin": [', '        "scripts/tool.bat",', '        "bin/tool"', '    ]', '}'],
+        ];
+
+        yield 'bin with uppercase BAT proxy conflicts keeps order' => [
+            ['{"bin": ["b/tool.BAT.bat", "a/tool.BAT"]}'],
+            ['{', '    "bin": [', '        "b/tool.BAT.bat",', '        "a/tool.BAT"', '    ]', '}'],
+        ];
+
+        yield 'bin with case-insensitive uppercase BAT proxy conflicts keeps order' => [
+            ['{"bin": ["b/tool.bat.bat", "a/tool.BAT"]}'],
+            ['{', '    "bin": [', '        "b/tool.bat.bat",', '        "a/tool.BAT"', '    ]', '}'],
         ];
 
         yield 'lists keep their order, except bin' => [
